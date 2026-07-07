@@ -8,10 +8,10 @@
 
 import { getProjectByName } from "../lib/projects.js";
 import {
-  searchSymbolExplorer,
-  expandSymbolExplorer,
-  getFullGraphExplorer
-} from "../lib/symbol-index.js";
+  searchSymbols,
+  expandNode,
+  analyzeProject
+} from "../lib/analyzer-service.js";
 import { sendOk, sendError } from "../utils/response.js";
 import {
   validateProjectName,
@@ -19,6 +19,9 @@ import {
   validateSearchQuery,
   parseLimit
 } from "../utils/validation.js";
+
+// Fallback import para .NET (retrocompatibilidade)
+import { getFullGraphExplorer as getFullGraphDotNet } from "../lib/symbol-index.js";
 
 /**
  * Resolves and validates a project.
@@ -67,8 +70,8 @@ export async function handleSearch(req, res, params, query) {
     return;
   }
 
-  const result = searchSymbolExplorer(project, q);
-  sendOk(res, 200, result, result.message);
+  const result = searchSymbols(project, q);
+  sendOk(res, 200, result, result.message || "Busca concluída");
 }
 
 /**
@@ -93,8 +96,8 @@ export async function handleExpand(req, res, params, query) {
     return;
   }
 
-  const result = expandSymbolExplorer(project, nodeId, direction);
-  sendOk(res, 200, result, result.message);
+  const result = expandNode(project, nodeId, direction);
+  sendOk(res, 200, result, result.message || "Expansão concluída");
 }
 
 /**
@@ -109,8 +112,28 @@ export async function handleFullGraph(req, res, params, query) {
   const layers = parseCsv(query.get("layers"));
   const features = parseCsv(query.get("features"));
 
-  const result = getFullGraphExplorer(project, { nodeLimit, edgeLimit, layers, features });
-  sendOk(res, 200, result, result.message);
+  // Tentar usar o novo analyzer-service, fallback para .NET direto
+  let result;
+  try {
+    const analysis = analyzeProject(project, { nodeLimit, edgeLimit, layers, features });
+    if (analysis.success || analysis.projectType === 'dotnet') {
+      // Usar o fullGraph do analyzer .NET
+      const dotNetAnalyzer = analysis;
+      if (dotNetAnalyzer.fullGraph) {
+        result = dotNetAnalyzer.fullGraph({ nodeLimit, edgeLimit, layers, features });
+      } else {
+        // Fallback para symbol-index.js
+        result = getFullGraphDotNet(project, { nodeLimit, edgeLimit, layers, features });
+      }
+    } else {
+      result = analysis;
+    }
+  } catch (err) {
+    // Fallback direto para .NET
+    result = getFullGraphDotNet(project, { nodeLimit, edgeLimit, layers, features });
+  }
+
+  sendOk(res, 200, result, result.message || "Gráfico completo retrievido");
 }
 
 function parseCsv(value) {
