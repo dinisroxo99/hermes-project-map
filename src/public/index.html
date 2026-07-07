@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="pt">
+  <head>
+    <meta charset="utf-8" />
+    <title>Hermes .NET Map</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="stylesheet" href="/style.css" />
+    <script src="/vendor/cytoscape.min.js"></script>
+<script src="/vendor/3d-force-graph.min.js"></script>
+  </head>
+
+  <body>
+    <header>
+      <div>
+        <h1>Hermes .NET Map</h1>
+        <p>Explorador inteligente de dependências .NET/C#</p>
+      </div>
+    </header>
+
+    <main>
+      <aside class="left-panel">
+        <div class="field">
+          <label>Projeto</label>
+          <select id="projectSelect"></select>
+        </div>
+
+        <div class="field">
+                  <label>Pesquisar símbolo</label>
+                  <input id="searchInput" placeholder="Ex: InvoiceCreationService" />
+                </div>
+
+                <div class="actions">
+                  <button id="searchBtn">Pesquisar</button>
+                  <button id="indexBtn" class="secondary">Gerar index.scip</button>
+                </div>
+
+                <section class="full-graph-section">
+                  <h3>Grafo Completo do Projeto</h3>
+                  <div class="field">
+                    <label>Limite de nós</label>
+                    <input id="nodeLimitInput" type="number" min="1" max="5000" value="500" />
+                  </div>
+                  <div class="field">
+                    <label>Limite de arestas</label>
+                    <input id="edgeLimitInput" type="number" min="1" max="10000" value="1200" />
+                  </div>
+                  <button id="loadFullGraphBtn" class="primary">Carregar projeto todo</button>
+                  <p id="fullGraphHint" class="hint"></p>
+                </section>
+
+                <section class="subdivision-section">
+                  <div class="section-title-row">
+                    <h3>Subdividir</h3>
+                    <span id="structureSummary" class="section-pill">A carregar…</span>
+                  </div>
+                  <p class="hint compact">
+                    Filtra por camada/projeto da solution ou por feature detetada nas pastas/namespaces.
+                  </p>
+                  <div class="filter-group">
+                    <h4>Camadas / projetos</h4>
+                    <div id="layerFilters" class="category-filters"></div>
+                  </div>
+                  <div class="filter-group">
+                    <h4>Features</h4>
+                    <div id="featureFilters" class="category-filters"></div>
+                  </div>
+                </section>
+
+                <div class="hint">
+          Clica num nó para ver detalhes.
+          Duplo clique num nó para expandir referências e dependências.
+        </div>
+
+        <section class="category-filter-section">
+          <div class="section-title-row">
+            <h3>Filtrar por tipo</h3>
+          </div>
+          <div id="categoryFilters" class="category-filters"></div>
+        </section>
+
+        <section class="legend">
+          <h3>Legenda</h3>
+          <div id="legendItems"></div>
+        </section>
+
+        <pre id="status"></pre>
+      </aside>
+
+      <section class="graph-panel">
+        <div class="graph-toolbar">
+          <div class="graph-heading">
+            <div class="graph-title-row">
+              <h2 id="graphTitle">Explorador</h2>
+              <span id="graphModeBadge" class="mode-badge">Focused</span>
+            </div>
+            <span id="graphStats">0 nós · 0 ligações</span>
+          </div>
+
+          <div class="toolbar-actions">
+            <button id="view2dBtn" class="secondary active-view">2D</button>
+            <button id="view3dBtn" class="secondary">3D</button>
+            <button id="layoutBtn" class="secondary">Reorganizar</button>
+            <button id="fitBtn" class="secondary">Encaixar</button>
+            <button id="clearBtn" class="danger">Limpar</button>
+          </div>
+        </div>
+
+        <div id="graph2d">
+            <div id="cy"></div>
+        </div>
+
+        <div id="graph3d" class="hidden"></div>
+      </section>
+
+      <aside class="right-panel">
+        <div class="details-header">
+          <h2>Detalhes</h2>
+        </div>
+
+        <div id="details" class="empty">
+          Pesquisa um símbolo e clica num nó para ver detalhes.
+        </div>
+      </aside>
+    </main>
+
+    <script src="/api-client.js"></script>
+    <script src="/app.js"></script>
+  </body>
+</html>

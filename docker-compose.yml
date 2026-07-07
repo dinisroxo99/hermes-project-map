@@ -1,0 +1,17 @@
+services:
+  hermes-dotnet-map:
+    build:
+      context: .
+      args:
+        DOTNET_VERSION: ${DOTNET_VERSION:-10.0}
+    container_name: hermes-dotnet-map
+    ports:
+      - "${PORT:-8770}:8770"
+    environment:
+      PORT: "8770"
+      DATA_DIR: "/app/data"
+      PROJECTS_ROOT_CONTAINER: "/projects"
+    volumes:
+      - "${PROJECTS_ROOT}:/projects:ro"
+      - "./data:/app/data"
+    restart: unless-stopped
