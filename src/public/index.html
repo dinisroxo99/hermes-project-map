@@ -74,6 +74,7 @@
         <section class="category-filter-section">
           <div class="section-title-row">
             <h3>Filtrar por tipo</h3>
+            <span id="categoryFilterSummary" class="section-pill">Auto</span>
           </div>
           <div id="categoryFilters" class="category-filters"></div>
         </section>
@@ -110,6 +111,28 @@
         </div>
 
         <div id="graph3d" class="hidden"></div>
+
+        <div id="threeDControls" class="three-d-controls hidden" aria-label="Controlos 3D">
+          <div class="three-d-control-row">
+            <span class="three-d-control-label">Zoom</span>
+            <button id="zoomIn3dBtn" class="secondary small-button" type="button">+</button>
+            <button id="zoomOut3dBtn" class="secondary small-button" type="button">−</button>
+            <button id="reset3dBtn" class="secondary small-button" type="button">Reset</button>
+          </div>
+          <div class="three-d-control-row">
+            <span class="three-d-control-label">Vista</span>
+            <button class="secondary small-button" type="button" data-3d-view="xy">XY</button>
+            <button class="secondary small-button" type="button" data-3d-view="xz">XZ</button>
+            <button class="secondary small-button" type="button" data-3d-view="yz">YZ</button>
+          </div>
+          <div class="three-d-control-row">
+            <span class="three-d-control-label">Rodar</span>
+            <button class="secondary small-button" type="button" data-3d-axis="x">X</button>
+            <button class="secondary small-button" type="button" data-3d-axis="y">Y</button>
+            <button class="secondary small-button" type="button" data-3d-axis="z">Z</button>
+          </div>
+          <div class="three-d-control-help">Rato: arrastar roda · scroll zoom · botão direito/Shift pan</div>
+        </div>
       </section>
 
       <aside class="right-panel">

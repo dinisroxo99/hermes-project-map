@@ -301,6 +301,7 @@ pre {
   display: flex;
   flex-direction: column;
   min-width: 0;
+  position: relative;
 }
 
 .graph-toolbar {
@@ -352,6 +353,56 @@ pre {
 .toolbar-actions {
   display: flex;
   gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.small-button {
+  padding: 6px 9px;
+  border-radius: 8px;
+  font-size: 12px;
+  line-height: 1;
+}
+
+.three-d-controls {
+  position: absolute;
+  top: 70px;
+  right: 14px;
+  z-index: 5;
+  display: grid;
+  gap: 8px;
+  width: min(290px, calc(100% - 28px));
+  padding: 10px;
+  border: 1px solid #334155;
+  border-radius: 12px;
+  background: rgba(15, 23, 42, 0.88);
+  box-shadow: 0 16px 40px rgba(2, 6, 23, 0.35);
+  backdrop-filter: blur(8px);
+}
+
+.three-d-control-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.three-d-control-label {
+  width: 46px;
+  color: #93c5fd;
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.three-d-control-help {
+  color: #94a3b8;
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.category-filter.compact-filter {
+  color: #e5e7eb;
 }
 
 #cy {
