@@ -12,6 +12,44 @@ $rootDir = Resolve-Path (Join-Path $PSScriptRoot "..")
 $envFile = Join-Path $rootDir ".env"
 $projectsFile = Join-Path $rootDir "data\projects.json"
 
+function Read-ProjectRegistry {
+  if (!(Test-Path $projectsFile)) {
+    return @()
+  }
+
+  $raw = Get-Content $projectsFile -Raw
+  if ([string]::IsNullOrWhiteSpace($raw)) {
+    return @()
+  }
+
+  $parsed = $raw | ConvertFrom-Json
+  if ($null -eq $parsed) {
+    return @()
+  }
+
+  return @($parsed | Where-Object {
+    $_.PSObject.Properties.Name -contains "name" -and
+    $_.PSObject.Properties.Name -contains "relativePath" -and
+    -not [string]::IsNullOrWhiteSpace($_.name) -and
+    -not [string]::IsNullOrWhiteSpace($_.relativePath)
+  })
+}
+
+function Write-ProjectRegistry($projects) {
+  $items = @($projects)
+
+  if ($items.Count -eq 0) {
+    $json = "[]`n"
+  } elseif ($items.Count -eq 1) {
+    $json = "[`n$($items[0] | ConvertTo-Json -Depth 10)`n]`n"
+  } else {
+    $json = ($items | ConvertTo-Json -Depth 10) + "`n"
+  }
+
+  $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+  [System.IO.File]::WriteAllText($projectsFile, $json, $utf8NoBom)
+}
+
 if (!(Test-Path $envFile)) {
   throw "Ficheiro .env não encontrado. Faz primeiro: copy .env.example .env"
 }
@@ -24,8 +62,8 @@ if (!$projectsRootLine) {
 }
 
 $projectsRoot = $projectsRootLine.Split("=", 2)[1].Trim().Trim('"')
-$projectsRootResolved = (Resolve-Path $projectsRoot).Path
-$projectResolved = (Resolve-Path $Path).Path
+$projectsRootResolved = (Resolve-Path $projectsRoot).Path.TrimEnd("\", "/")
+$projectResolved = (Resolve-Path $Path).Path.TrimEnd("\", "/")
 
 if (!$projectResolved.StartsWith($projectsRootResolved, [System.StringComparison]::OrdinalIgnoreCase)) {
   throw "O projeto tem de estar dentro de PROJECTS_ROOT. PROJECTS_ROOT atual: $projectsRootResolved"
@@ -38,12 +76,15 @@ if ($Name -notmatch "^[a-zA-Z0-9][a-zA-Z0-9\-_]*$") {
 $relativePath = $projectResolved.Substring($projectsRootResolved.Length).TrimStart("\", "/")
 $relativePath = $relativePath -replace "\\", "/"
 
-if (!(Test-Path $projectsFile)) {
-  "[]" | Out-File $projectsFile -Encoding utf8
+if ([string]::IsNullOrWhiteSpace($relativePath)) {
+  throw "O projeto não pode ser a própria pasta PROJECTS_ROOT. Escolhe uma subpasta."
 }
 
-$projects = @(Get-Content $projectsFile -Raw | ConvertFrom-Json)
+if (!(Test-Path $projectsFile)) {
+  Write-ProjectRegistry @()
+}
 
+$projects = @(Read-ProjectRegistry)
 $projects = @($projects | Where-Object { $_.name -ne $Name })
 
 $projects += [PSCustomObject]@{
@@ -52,7 +93,7 @@ $projects += [PSCustomObject]@{
   addedAt = (Get-Date).ToString("s")
 }
 
-ConvertTo-Json -InputObject @($projects) -Depth 10 | Out-File $projectsFile -Encoding utf8
+Write-ProjectRegistry $projects
 
 Write-Host ""
 Write-Host "Projeto adicionado:" -ForegroundColor Green

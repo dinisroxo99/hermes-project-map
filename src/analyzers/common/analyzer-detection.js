@@ -26,28 +26,31 @@ export function detectProjectType(absolutePath) {
   const fileSet = new Set(files.map(f => f.toLowerCase()));
 
   // .NET detection
-  const hasCsproj = files.some(f => f.toLowerCase().endsWith('.csproj'));
-  const hasSln = files.some(f => f.toLowerCase().endsWith('.sln'));
-  const hasDotnetProps = fileSet.has(' Directory.Build.props') || fileSet.has('directory.build.props');
+  const hasCsproj = files.some(f => f.toLowerCase().endsWith('.csproj'))
+    || hasNestedFileWithExtension(absolutePath, '.csproj', 3);
+  const hasSln = files.some(f => {
+    const lower = f.toLowerCase();
+    return lower.endsWith('.sln') || lower.endsWith('.slnx');
+  });
+  const hasDotnetProps = fileSet.has('directory.build.props');
   
   if (hasCsproj || hasSln || hasDotnetProps) {
     return 'dotnet';
   }
 
-  // Node.js detection
+  // Node.js / TypeScript detection
   const hasPackageJson = fileSet.has('package.json');
-  const hasNodeModules = fileSet.has('node_modules');
   const hasJsFiles = files.some(f => f.endsWith('.js') && !f.startsWith('.'));
+  const hasTsConfig = fileSet.has('tsconfig.json');
+  const hasTsFiles = files.some(f => f.endsWith('.ts') && !f.endsWith('.d.ts'))
+    || hasNestedFileWithExtension(absolutePath, '.ts', 4)
+    || hasNestedFileWithExtension(absolutePath, '.tsx', 4);
 
-  if (hasPackageJson && (hasJsFiles || hasNodeModules)) {
-    // Distinguish between plain Node.js and TypeScript
-    const hasTsConfig = fileSet.has('tsconfig.json');
-    const hasTsFiles = files.some(f => f.endsWith('.ts') && !f.endsWith('.d.ts'));
+  if (hasPackageJson && (hasTsConfig || hasTsFiles)) {
+    return 'typescript';
+  }
 
-    if (hasTsConfig || hasTsFiles) {
-      return 'typescript';
-    }
-
+  if (hasPackageJson || hasJsFiles) {
     return 'nodejs';
   }
 
@@ -62,6 +65,38 @@ export function detectProjectType(absolutePath) {
   }
 
   return 'unknown';
+}
+
+function hasNestedFileWithExtension(root, extension, maxDepth) {
+  const ignored = new Set(['bin', 'obj', '.git', '.vs', 'node_modules', '.next', 'dist', 'build', 'coverage']);
+
+  function walk(dir, depth) {
+    if (depth > maxDepth || !fs.existsSync(dir)) {
+      return false;
+    }
+
+    const entries = fs.readdirSync(dir, { withFileTypes: true });
+
+    for (const entry of entries) {
+      if (ignored.has(entry.name)) {
+        continue;
+      }
+
+      const fullPath = path.join(dir, entry.name);
+
+      if (entry.isFile() && entry.name.toLowerCase().endsWith(extension)) {
+        return true;
+      }
+
+      if (entry.isDirectory() && walk(fullPath, depth + 1)) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  return walk(root, 0);
 }
 
 /**
