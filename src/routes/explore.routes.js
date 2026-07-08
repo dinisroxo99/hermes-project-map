@@ -112,28 +112,21 @@ export async function handleFullGraph(req, res, params, query) {
   const layers = parseCsv(query.get("layers"));
   const features = parseCsv(query.get("features"));
 
-  // Tentar usar o novo analyzer-service, fallback para .NET direto
   let result;
+
   try {
     const analysis = analyzeProject(project, { nodeLimit, edgeLimit, layers, features });
-    if (analysis.success || analysis.projectType === 'dotnet') {
-      // Usar o fullGraph do analyzer .NET
-      const dotNetAnalyzer = analysis;
-      if (dotNetAnalyzer.fullGraph) {
-        result = dotNetAnalyzer.fullGraph({ nodeLimit, edgeLimit, layers, features });
-      } else {
-        // Fallback para symbol-index.js
-        result = getFullGraphDotNet(project, { nodeLimit, edgeLimit, layers, features });
-      }
+
+    if (typeof analysis.fullGraph === "function") {
+      result = analysis.fullGraph({ nodeLimit, edgeLimit, layers, features });
     } else {
       result = analysis;
     }
   } catch (err) {
-    // Fallback direto para .NET
     result = getFullGraphDotNet(project, { nodeLimit, edgeLimit, layers, features });
   }
 
-  sendOk(res, 200, result, result.message || "Gráfico completo retrievido");
+  sendOk(res, 200, result, result.message || "Grafo completo carregado");
 }
 
 function parseCsv(value) {

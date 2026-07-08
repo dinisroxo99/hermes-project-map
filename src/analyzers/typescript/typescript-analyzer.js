@@ -1,11 +1,11 @@
 /**
  * TypeScript Analyzer
  *
- * Analyzes TypeScript/JavaScript projects using ts-morph.
- * Extracts: imports, exports, components, hooks, providers, types/interfaces.
+ * Initial analyzer for TypeScript/JavaScript projects using ts-morph.
+ * Extracts imports, exports, React components, hooks, providers, types and interfaces.
  */
 
-import { Project, SyntaxKind } from 'ts-morph';
+import { Project } from 'ts-morph';
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -21,62 +21,75 @@ const IGNORED_DIRS = new Set([
 ]);
 
 export function analyzeTypeScriptProject(project, options = {}) {
-  const { nodeLimit = 500 } = options;
+  const {
+    nodeLimit = 500,
+    edgeLimit = 1200,
+    layers = [],
+    features = []
+  } = options;
   const rootPath = project.absolutePath;
 
   if (!fs.existsSync(rootPath)) {
-    return {
-      success: false,
-      projectType: 'typescript',
-      message: `Caminho do projeto não encontrado: ${rootPath}`,
-      nodes: [],
-      edges: []
-    };
+    return emptyResult(`Caminho do projeto não encontrado: ${rootPath}`);
   }
 
-  if (!hasTypeScriptFiles(rootPath)) {
-    return {
-      success: false,
-      projectType: 'typescript',
-      message: 'Nenhum ficheiro .ts/.tsx encontrado',
-      nodes: [],
-      edges: []
-    };
+  const files = findAllSourceFiles(rootPath);
+
+  if (!files.length) {
+    return emptyResult('Nenhum ficheiro .ts/.tsx/.js/.jsx encontrado');
   }
 
   try {
     const tsConfigPath = path.join(rootPath, 'tsconfig.json');
-    const project_morph = new Project({
+    const tsProject = new Project({
       tsConfigFilePath: fs.existsSync(tsConfigPath) ? tsConfigPath : undefined,
-      skipAddingFilesFromTsConfig: true
+      skipAddingFilesFromTsConfig: true,
+      compilerOptions: {
+        allowJs: true
+      }
     });
 
-    const files = findAllTsFiles(rootPath);
-    
     for (const file of files) {
-      if (fs.existsSync(file)) {
-        project_morph.addSourceFileAtPath(file);
-      }
+      tsProject.addSourceFileAtPath(file);
     }
 
     const nodes = [];
     const edges = [];
-    const symbolMap = new Map();
+    const seenNodeKeys = new Set();
+    const symbolsByName = new Map();
+    const fileSymbolsByPath = new Map();
+    const sourceFiles = tsProject.getSourceFiles().filter((sourceFile) => {
+      const relativePath = normalizeRelativePath(rootPath, sourceFile.getFilePath());
+      return !shouldIgnorePath(relativePath);
+    });
 
-    for (const sourceFile of project_morph.getSourceFiles()) {
-      const relativePath = path.relative(rootPath, sourceFile.getFilePath());
-      
-      if (shouldIgnorePath(relativePath)) continue;
-
-      extractExports(sourceFile, relativePath, nodes, symbolMap);
-      extractImports(sourceFile, symbolMap, edges);
+    for (const sourceFile of sourceFiles) {
+      const relativePath = normalizeRelativePath(rootPath, sourceFile.getFilePath());
+      extractSymbols(sourceFile, relativePath, {
+        nodes,
+        seenNodeKeys,
+        symbolsByName,
+        fileSymbolsByPath
+      });
     }
 
-    const limitedNodes = nodes.slice(0, nodeLimit);
-    const limitedNodeIds = new Set(limitedNodes.map(n => n.id));
-    const limitedEdges = edges.filter(e => 
-      limitedNodeIds.has(e.from) && limitedNodeIds.has(e.to)
-    ).slice(0, 1200);
+    for (const sourceFile of sourceFiles) {
+      const relativePath = normalizeRelativePath(rootPath, sourceFile.getFilePath());
+      extractImportEdges(sourceFile, relativePath, {
+        edges,
+        symbolsByName,
+        fileSymbolsByPath
+      });
+    }
+
+    const filteredNodes = filterNodes(nodes, { layers, features });
+    const allowedNodeIds = new Set(filteredNodes.map((node) => node.id));
+    const limitedNodes = filteredNodes.slice(0, nodeLimit);
+    const limitedNodeIds = new Set(limitedNodes.map((node) => node.id));
+    const limitedEdges = uniqueEdges(edges)
+      .filter((edge) => allowedNodeIds.has(edge.from) && allowedNodeIds.has(edge.to))
+      .filter((edge) => limitedNodeIds.has(edge.from) && limitedNodeIds.has(edge.to))
+      .slice(0, edgeLimit);
 
     return {
       success: true,
@@ -90,38 +103,36 @@ export function analyzeTypeScriptProject(project, options = {}) {
         totalEdges: edges.length
       }
     };
-
   } catch (error) {
     console.error('[TypeScriptAnalyzer] Error:', error);
-    return {
-      success: false,
-      projectType: 'typescript',
-      message: `Erro ao analisar: ${error.message}`,
-      nodes: [],
-      edges: []
-    };
+    return emptyResult(`Erro ao analisar: ${error.message}`);
   }
 }
 
-function hasTypeScriptFiles(rootPath) {
-  const files = findAllTsFiles(rootPath);
-  return files.length > 0;
+function emptyResult(message) {
+  return {
+    success: false,
+    projectType: 'typescript',
+    message,
+    nodes: [],
+    edges: []
+  };
 }
 
-function findAllTsFiles(rootPath) {
+function findAllSourceFiles(rootPath) {
   const files = [];
-  
+
   function walk(dir) {
     if (!fs.existsSync(dir)) return;
-    
+
     const entries = fs.readdirSync(dir, { withFileTypes: true });
-    
+
     for (const entry of entries) {
       const fullPath = path.join(dir, entry.name);
-      const relativePath = path.relative(rootPath, fullPath);
-      
+      const relativePath = normalizeRelativePath(rootPath, fullPath);
+
       if (shouldIgnorePath(relativePath)) continue;
-      
+
       if (entry.isDirectory()) {
         walk(fullPath);
       } else if (/\.(ts|tsx|js|jsx)$/.test(entry.name)) {
@@ -129,165 +140,194 @@ function findAllTsFiles(rootPath) {
       }
     }
   }
-  
+
   walk(rootPath);
   return files;
 }
 
+function normalizeRelativePath(rootPath, filePath) {
+  return path.relative(rootPath, filePath).replace(/\\/g, '/');
+}
+
 function shouldIgnorePath(relativePath) {
-  const parts = relativePath.split(path.sep);
+  const parts = relativePath.split(/[\\/]+/);
+
   for (const part of parts) {
     if (IGNORED_DIRS.has(part)) return true;
   }
+
   return false;
 }
 
-function extractExports(sourceFile, relativePath, nodes, symbolMap) {
+function extractSymbols(sourceFile, relativePath, context) {
   const fileName = path.basename(sourceFile.getFilePath());
   const sourceText = sourceFile.getText();
 
-  // Classes
   for (const declaration of sourceFile.getClasses()) {
-    const name = declaration.getName();
-    if (!name) continue;
-    
-    const node = createNode({
-      name,
+    registerSymbol(context, relativePath, createNode({
+      name: declaration.getName(),
       kind: 'class',
       relativePath,
       fileName,
       start: declaration.getStart(),
-      category: classifyNode(name, 'class')
-    });
-    
-    nodes.push(node);
-    symbolMap.set(name, node);
+      category: classifyNode(declaration.getName(), 'class')
+    }));
   }
 
-  // Exported functions
-  for (const declaration of sourceFile.getExportedDeclarations().values()) {
-    for (const decl of Array.isArray(declaration) ? declaration : [declaration]) {
-      const name = decl.getName?.();
-      if (!name) continue;
-      
-      const kind = decl.getKindName?.().toLowerCase() || 'symbol';
-      const start = decl.getStart?.() || 0;
-      
-      let category = 'symbol';
-      if (kind.includes('class')) category = classifyNode(name, 'class');
-      else if (kind.includes('function')) category = classifyNode(name, 'function');
-      else if (kind.includes('interface')) category = 'interface';
-      else if (kind.includes('type')) category = 'type';
+  for (const declaration of sourceFile.getFunctions()) {
+    registerSymbol(context, relativePath, createNode({
+      name: declaration.getName(),
+      kind: isHookName(declaration.getName()) ? 'hook' : 'function',
+      relativePath,
+      fileName,
+      start: declaration.getStart(),
+      category: classifyNode(declaration.getName(), 'function')
+    }));
+  }
 
-      if (!symbolMap.has(name)) {
-        const node = createNode({
-          name,
-          kind: kind.replace('Declaration', '').toLowerCase(),
-          relativePath,
-          fileName,
-          start,
-          category
-        });
-        
-        nodes.push(node);
-        symbolMap.set(name, node);
-      }
+  for (const declaration of sourceFile.getInterfaces()) {
+    registerSymbol(context, relativePath, createNode({
+      name: declaration.getName(),
+      kind: 'interface',
+      relativePath,
+      fileName,
+      start: declaration.getStart(),
+      category: 'interface'
+    }));
+  }
+
+  for (const declaration of sourceFile.getTypeAliases()) {
+    registerSymbol(context, relativePath, createNode({
+      name: declaration.getName(),
+      kind: 'type',
+      relativePath,
+      fileName,
+      start: declaration.getStart(),
+      category: 'type'
+    }));
+  }
+
+  for (const declaration of sourceFile.getVariableDeclarations()) {
+    const name = declaration.getName();
+
+    if (!isInterestingVariableSymbol(name)) {
+      continue;
     }
+
+    registerSymbol(context, relativePath, createNode({
+      name,
+      kind: isHookName(name) ? 'hook' : 'component',
+      relativePath,
+      fileName,
+      start: declaration.getStart(),
+      category: classifyNode(name, 'component')
+    }));
   }
 
-  // React Components (capitalized function/constants)
-  const componentRegex = /const\s+([A-Z][a-zA-Z0-9_]*)\s*=/g;
+  extractRegexSymbols(sourceText, relativePath, fileName, context);
+}
+
+function extractRegexSymbols(sourceText, relativePath, fileName, context) {
+  const componentRegex = /(?:export\s+)?const\s+([A-Z][A-Za-z0-9_]*)\s*=/g;
+  const hookRegex = /(?:export\s+)?(?:function|const)\s+(use[A-Za-z0-9_]*)\s*(?:=|\()/g;
   let match;
-  
+
   while ((match = componentRegex.exec(sourceText)) !== null) {
     const name = match[1];
-    
-    if (!symbolMap.has(name)) {
-      const node = createNode({
-        name,
-        kind: 'component',
-        relativePath,
-        fileName,
-        start: match.index,
-        category: 'component'
-      });
-      
-      nodes.push(node);
-      symbolMap.set(name, node);
-    }
+    registerSymbol(context, relativePath, createNode({
+      name,
+      kind: 'component',
+      relativePath,
+      fileName,
+      start: match.index,
+      category: classifyNode(name, 'component')
+    }));
   }
 
-  // Hooks (use* functions)
-  const hookRegex = /export\s+function\s+(use[A-Za-z0-9_]*)\s*\(/g;
-  
   while ((match = hookRegex.exec(sourceText)) !== null) {
     const name = match[1];
-    
-    if (!symbolMap.has(name)) {
-      const node = createNode({
-        name,
-        kind: 'hook',
-        relativePath,
-        fileName,
-        start: match.index,
-        category: 'hook'
-      });
-      
-      nodes.push(node);
-      symbolMap.set(name, node);
+    registerSymbol(context, relativePath, createNode({
+      name,
+      kind: 'hook',
+      relativePath,
+      fileName,
+      start: match.index,
+      category: 'hook'
+    }));
+  }
+}
+
+function registerSymbol(context, relativePath, node) {
+  if (!node?.label) return;
+
+  const key = `${relativePath}:${node.label}`;
+
+  if (context.seenNodeKeys.has(key)) {
+    return;
+  }
+
+  context.seenNodeKeys.add(key);
+  context.nodes.push(node);
+
+  if (!context.symbolsByName.has(node.label)) {
+    context.symbolsByName.set(node.label, []);
+  }
+  context.symbolsByName.get(node.label).push(node);
+
+  if (!context.fileSymbolsByPath.has(relativePath)) {
+    context.fileSymbolsByPath.set(relativePath, []);
+  }
+  context.fileSymbolsByPath.get(relativePath).push(node);
+}
+
+function extractImportEdges(sourceFile, relativePath, context) {
+  const sourceSymbols = context.fileSymbolsByPath.get(relativePath) || [];
+
+  if (!sourceSymbols.length) return;
+
+  for (const importDeclaration of sourceFile.getImportDeclarations()) {
+    const moduleSpecifier = importDeclaration.getModuleSpecifierValue();
+
+    if (!moduleSpecifier.startsWith('.') && !moduleSpecifier.startsWith('/')) {
+      continue;
+    }
+
+    for (const element of importDeclaration.getNamedImports()) {
+      const importName = element.getName();
+      const targetSymbols = context.symbolsByName.get(importName) || [];
+      addImportEdges(context.edges, sourceSymbols, targetSymbols, importName, 'importa');
+    }
+
+    const defaultImport = importDeclaration.getDefaultImport();
+    if (defaultImport) {
+      const importName = defaultImport.getText();
+      const targetSymbols = context.symbolsByName.get(importName) || [];
+      addImportEdges(context.edges, sourceSymbols, targetSymbols, importName, 'importa default');
     }
   }
 }
 
-function extractImports(sourceFile, symbolMap, edges) {
-  for (const importDeclaration of sourceFile.getImportDeclarations()) {
-    const moduleSpecifier = importDeclaration.getModuleSpecifierValue();
-    
-    // Only internal imports (start with . or /)
-    if (!moduleSpecifier.startsWith('.') && !moduleSpecifier.startsWith('/')) {
-      continue;
-    }
-    
-    const namedImports = importDeclaration.getNamedBindings();
-    
-    if (namedImports && 'getElements' in namedImports) {
-      for (const element of namedImports.getElements()) {
-        const importName = element.getName();
-        const importedSymbol = symbolMap.get(importName);
-        
-        if (importedSymbol) {
-          edges.push({
-            id: `${sourceFile.getFilePath()}:${importName}`,
-            from: importedSymbol.id,
-            to: importedSymbol.id,
-            relation: 'imports',
-            label: 'importa'
-          });
-        }
-      }
-    }
-    
-    if (importDeclaration.hasNamespaceImport()) {
-      const namespaceImport = importDeclaration.getNamespaceImport();
-      const importName = namespaceImport.getName();
-      const importedSymbol = symbolMap.get(importName);
-      
-      if (importedSymbol) {
-        edges.push({
-          id: `${sourceFile.getFilePath()}:${importName}:ns`,
-          from: importedSymbol.id,
-          to: importedSymbol.id,
-          relation: 'imports',
-          label: 'importa *'
-        });
-      }
+function addImportEdges(edges, sourceSymbols, targetSymbols, importName, label) {
+  for (const sourceSymbol of sourceSymbols) {
+    for (const targetSymbol of targetSymbols) {
+      if (sourceSymbol.id === targetSymbol.id) continue;
+
+      edges.push({
+        id: `ts-edge-${sourceSymbol.id}-${targetSymbol.id}-${simpleHash(importName)}`,
+        from: sourceSymbol.id,
+        to: targetSymbol.id,
+        relation: 'imports',
+        label
+      });
     }
   }
 }
 
 function createNode({ name, kind, relativePath, fileName, start, category }) {
+  if (!name) return null;
+
   const hash = simpleHash(`${relativePath}:${name}`);
-  
+
   return {
     id: `ts-${hash}`,
     label: name,
@@ -298,56 +338,89 @@ function createNode({ name, kind, relativePath, fileName, start, category }) {
     layer: inferLayer(relativePath),
     feature: inferFeature(relativePath),
     file: relativePath,
-    subtitle: `${fileName}:${start || 0}`,
-    _relativePath: relativePath,
-    _start: start
+    subtitle: `${fileName}:${start || 0}`
   };
 }
 
-function classifyNode(name, kind) {
-  if (kind === 'component' || name.endsWith('Component')) return 'component';
-  if (kind === 'hook' || name.endsWith('Hook')) return 'hook';
-  if (name.endsWith('Provider') || name.endsWith('Container')) return 'provider';
-  if (name.endsWith('Service')) return 'service';
+function classifyNode(name = '', kind) {
+  if (isHookName(name) || kind === 'hook') return 'hook';
+  if (name.endsWith('Provider')) return 'provider';
   if (name.endsWith('Context')) return 'context';
-  
+  if (name.endsWith('Service')) return 'service';
+  if (name.endsWith('Component') || kind === 'component' || /^[A-Z]/.test(name)) return 'component';
+
   return 'symbol';
 }
 
+function isInterestingVariableSymbol(name) {
+  return /^[A-Z][A-Za-z0-9_]*$/.test(name) || isHookName(name) || name.endsWith('Provider');
+}
+
+function isHookName(name = '') {
+  return /^use[A-Z0-9_]/.test(name);
+}
+
 function inferLayer(relativePath) {
-  const pathLower = relativePath.toLowerCase();
-  
+  const pathLower = `/${relativePath.toLowerCase()}`;
+
   if (pathLower.includes('/components/')) return 'presentation';
   if (pathLower.includes('/hooks/')) return 'logic';
   if (pathLower.includes('/utils/') || pathLower.includes('/lib/')) return 'common';
-  if (pathLower.includes('/services/')) return 'services';
+  if (pathLower.includes('/services/') || pathLower.includes('/api/')) return 'services';
   if (pathLower.includes('/types/') || pathLower.includes('/interfaces/')) return 'types';
-  
+
   return 'unknown';
 }
 
 function inferFeature(relativePath) {
-  const parts = relativePath.split(path.sep);
-  const commonDirs = ['src', 'components', 'hooks', 'utils', 'lib', 'types', 'features'];
-  
+  const parts = relativePath.split('/');
+  const commonDirs = new Set(['src', 'app', 'pages', 'components', 'hooks', 'utils', 'lib', 'types', 'features']);
+
   for (const part of parts) {
-    if (!commonDirs.includes(part.toLowerCase())) {
+    if (part.includes('.')) continue;
+    if (!commonDirs.has(part.toLowerCase())) {
       return part;
     }
   }
-  
+
   return 'shared';
+}
+
+function filterNodes(nodes, { layers = [], features = [] }) {
+  const layerFilter = new Set(layers.filter((item) => item && item !== '__none__'));
+  const featureFilter = new Set(features.filter((item) => item && item !== '__none__'));
+
+  return nodes.filter((node) => {
+    if (layers.includes('__none__')) return false;
+    if (features.includes('__none__')) return false;
+    if (layerFilter.size && !layerFilter.has(node.layer)) return false;
+    if (featureFilter.size && !featureFilter.has(node.feature)) return false;
+    return true;
+  });
+}
+
+function uniqueEdges(edges) {
+  const seen = new Set();
+  const unique = [];
+
+  for (const edge of edges) {
+    if (seen.has(edge.id)) continue;
+    seen.add(edge.id);
+    unique.push(edge);
+  }
+
+  return unique;
 }
 
 function simpleHash(str) {
   let hash = 0;
-  
+
   for (let i = 0; i < str.length; i++) {
     const char = str.charCodeAt(i);
     hash = ((hash << 5) - hash) + char;
     hash = hash & hash;
   }
-  
+
   return Math.abs(hash).toString(16);
 }
 
@@ -360,7 +433,7 @@ export function searchSymbols(result, query) {
       edges: []
     };
   }
-  
+
   const q = query.trim().toLowerCase();
   if (!q) {
     return {
@@ -370,13 +443,14 @@ export function searchSymbols(result, query) {
       edges: []
     };
   }
-  
-  const matches = result.nodes.filter(n => 
-    n.label.toLowerCase().includes(q) ||
-    n.kind.toLowerCase().includes(q) ||
-    n.category.toLowerCase().includes(q)
+
+  const matches = result.nodes.filter((node) =>
+    node.label.toLowerCase().includes(q) ||
+    node.kind.toLowerCase().includes(q) ||
+    node.category.toLowerCase().includes(q) ||
+    node.file.toLowerCase().includes(q)
   ).slice(0, 20);
-  
+
   return {
     success: true,
     message: `Encontrei ${matches.length} símbolos com "${query}"`,
@@ -391,35 +465,41 @@ export function expandNode(result, nodeId, direction = 'both') {
     return {
       success: false,
       message: result.message,
-      node: null,
-      dependencies: []
+      nodes: [],
+      edges: []
     };
   }
-  
-  const target = result.nodes.find(n => n.id === nodeId);
-  
+
+  const target = result.nodes.find((node) => node.id === nodeId);
+
   if (!target) {
     return {
       success: false,
       message: 'Nó não encontrado',
-      node: null,
-      dependencies: []
+      nodes: [],
+      edges: []
     };
   }
-  
-  const outgoing = result.edges.filter(e => e.from === nodeId);
-  const incoming = result.edges.filter(e => e.to === nodeId);
-  
+
+  const outgoing = result.edges.filter((edge) => edge.from === nodeId);
+  const incoming = result.edges.filter((edge) => edge.to === nodeId);
+  const selectedEdges = direction === 'both'
+    ? [...outgoing, ...incoming]
+    : direction === 'out'
+      ? outgoing
+      : incoming;
+  const nodeIds = new Set([nodeId]);
+
+  for (const edge of selectedEdges) {
+    nodeIds.add(edge.from);
+    nodeIds.add(edge.to);
+  }
+
   return {
     success: true,
     message: `${target.label}: ${outgoing.length} dependências, ${incoming.length} referências`,
-    node: target,
-    dependencies: direction === 'both' ? [...outgoing, ...incoming] : 
-                  direction === 'out' ? outgoing : incoming,
+    nodes: result.nodes.filter((node) => nodeIds.has(node.id)),
+    edges: selectedEdges,
     projectType: 'typescript'
   };
-}
-
-export function analyzeDotNetProject(project, options = {}) {
-  return analyzeTypeScriptProject(project, options);
 }
