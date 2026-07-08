@@ -1,74 +1,74 @@
-# Implementação — Multi-project analyzers
+# Implementation — Multi-project analyzers
 
-[← README](../README.md) · [Adicionar projetos](./adding-projects.md) · [Execução](./analyzers-execution.md) · [Integração Hermes](./hermes-tool-integration.md)
+[← README](../README.md) · [Adding projects](./adding-projects.md) · [Execution](./analyzers-execution.md) · [Hermes integration](./hermes-tool-integration.md)
 
-## Objetivo
+## Purpose
 
-Criar uma base mínima para o `hermes-project-map` suportar múltiplos tipos de projeto sem quebrar o suporte .NET existente.
+Create a minimal foundation that allows `hermes-project-map` to support multiple project types without breaking the existing .NET support.
 
-A implementação atual mantém os endpoints públicos e introduz um dispatcher (`analyzer-service`) que escolhe o analyzer adequado com base no tipo de projeto.
+The current implementation keeps the public endpoints unchanged and introduces a dispatcher (`analyzer-service`) that selects the appropriate analyzer based on the project type.
 
-## Âmbito implementado
+## Implemented scope
 
-- Suporte atual preservado para projetos `.NET`.
-- Suporte inicial para projetos `TypeScript` / `React` / `Next.js`.
-- Sem alterações na UI.
-- Sem reescrever o analyzer .NET existente.
-- Sem alterar os contratos dos endpoints atuais.
+- Existing support for `.NET` projects is preserved.
+- Initial support for `TypeScript` / `React` / `Next.js` projects is included.
+- The UI is unchanged.
+- The existing .NET analyzer has not been rewritten.
+- The contracts of the current endpoints are unchanged.
 
-## Ficheiros principais
+## Main files
 
 ### `src/lib/analyzer-service.js`
 
-Dispatcher central usado pelas rotas.
+Central dispatcher used by the routes.
 
-Responsabilidades:
+Responsibilities:
 
-- detectar o tipo do projeto através de `detectProjectType(project.absolutePath)`;
-- delegar `.NET` para `analyzeDotNetProject(...)`;
-- delegar `TypeScript` para `analyzeTypeScriptProject(...)`;
-- expor funções compatíveis com as rotas atuais:
+- detect the project type through `detectProjectType(project.absolutePath)`;
+- delegate `.NET` projects to `analyzeDotNetProject(...)`;
+- delegate `TypeScript` projects to `analyzeTypeScriptProject(...)`;
+- expose functions compatible with the existing routes:
   - `analyzeProject(project, options)`;
   - `searchSymbols(project, query)`;
   - `expandNode(project, nodeId, direction)`.
 
 ### `src/analyzers/common/analyzer-detection.js`
 
-Deteção simples por ficheiros na raiz do projeto.
+Simple detection based on files in the project root.
 
-Tipos reconhecidos:
+Recognized types:
 
-- `dotnet`: `.csproj`, `.sln` ou `Directory.Build.props`;
-- `typescript`: `package.json` com `tsconfig.json` ou ficheiros `.ts`;
-- `nodejs`: `package.json` com `.js`/`node_modules`, mas sem sinais TypeScript;
-- `python`: `pyproject.toml`, `setup.py` ou `requirements.txt` com ficheiros `.py`;
+- `dotnet`: `.csproj`, `.sln`, or `Directory.Build.props`;
+- `typescript`: `package.json` with `tsconfig.json` or `.ts` files;
+- `nodejs`: `package.json` with `.js`/`node_modules`, but without TypeScript signals;
+- `python`: `pyproject.toml`, `setup.py`, or `requirements.txt` with `.py` files;
 - `unknown`: fallback.
 
-Tipos atualmente suportados por analyzer:
+Project types currently supported by an analyzer:
 
 - `dotnet`;
 - `typescript`.
 
 ### `src/analyzers/dotnet/dotnet-analyzer.js`
 
-Wrapper fino sobre o código antigo em `src/lib/symbol-index.js`.
+A thin wrapper around the previous code in `src/lib/symbol-index.js`.
 
-Mantém compatibilidade com:
+It preserves compatibility with:
 
 - `searchSymbolExplorer(...)`;
 - `expandSymbolExplorer(...)`;
 - `getFullGraphExplorer(...)`.
 
-Este ficheiro existe para que o novo dispatcher consiga tratar `.NET` como mais um analyzer sem mexer na implementação antiga.
+This file allows the new dispatcher to treat `.NET` as another analyzer without changing the legacy implementation.
 
 ### `src/analyzers/typescript/typescript-analyzer.js`
 
-Analyzer inicial para projetos TypeScript/JavaScript usando `ts-morph`.
+Initial analyzer for TypeScript/JavaScript projects using `ts-morph`.
 
-Responsabilidades atuais:
+Current responsibilities:
 
-- localizar ficheiros `.ts`, `.tsx`, `.js`, `.jsx`;
-- ignorar diretórios pesados ou gerados:
+- locate `.ts`, `.tsx`, `.js`, and `.jsx` files;
+- ignore heavy or generated directories:
   - `node_modules`;
   - `.next`;
   - `dist`;
@@ -77,21 +77,21 @@ Responsabilidades atuais:
   - `.git`;
   - `.vscode`;
   - `public`;
-- extrair símbolos:
+- extract symbols:
   - classes;
-  - funções exportadas;
+  - exported functions;
   - interfaces;
   - type aliases;
-  - componentes React por nome `CapitalCase`;
-  - hooks exportados `use*`;
-  - providers por sufixo `Provider`;
-- criar `nodes` no formato usado pelo grafo atual;
-- criar `edges` a partir de imports internos relativos (`./...` ou `/...`);
-- implementar pesquisa e expansão básica para TypeScript.
+  - React components named in `CapitalCase`;
+  - exported hooks named `use*`;
+  - providers with the `Provider` suffix;
+- create `nodes` in the format used by the current graph;
+- create `edges` from relative internal imports (`./...` or `/...`);
+- implement basic search and expansion for TypeScript.
 
-## Formato dos nodes
+## Node format
 
-O analyzer TypeScript devolve nodes compatíveis com o grafo atual:
+The TypeScript analyzer returns nodes compatible with the current graph:
 
 ```js
 {
@@ -108,18 +108,18 @@ O analyzer TypeScript devolve nodes compatíveis com o grafo atual:
 }
 ```
 
-Mapeamento principal:
+Main mapping:
 
-- `label`: nome do símbolo;
-- `kind`: tipo técnico (`class`, `function`, `interface`, `type`, `component`, `hook`);
-- `category`: categoria visual/lógica (`component`, `hook`, `provider`, `service`, `context`, etc.);
-- `file`: caminho relativo do ficheiro;
-- `layer`: inferido pelo path (`components`, `hooks`, `lib`, `services`, `types`);
-- `feature`: primeira pasta significativa fora de diretórios comuns.
+- `label`: symbol name;
+- `kind`: technical type (`class`, `function`, `interface`, `type`, `component`, `hook`);
+- `category`: visual/logical category (`component`, `hook`, `provider`, `service`, `context`, etc.);
+- `file`: relative file path;
+- `layer`: inferred from the path (`components`, `hooks`, `lib`, `services`, `types`);
+- `feature`: first meaningful folder outside common directories.
 
-## Formato dos edges
+## Edge format
 
-Os edges TypeScript seguem o shape usado pelo grafo:
+TypeScript edges follow the shape used by the graph:
 
 ```js
 {
@@ -131,46 +131,46 @@ Os edges TypeScript seguem o shape usado pelo grafo:
 }
 ```
 
-Atualmente representam imports internos com:
+They currently represent internal imports with:
 
 - `relation: "imports"`;
-- `label: "importa"` ou `"importa *"`.
+- `label: "importa"` or `"importa *"`.
 
-## Rotas adaptadas
+## Adapted routes
 
 ### `src/routes/explore.routes.js`
 
-As rotas continuam iguais:
+The routes remain the same:
 
 - `GET /api/explore/:project/search?q=...`
 - `GET /api/explore/:project/expand?nodeId=...&direction=both|in|out`
 - `GET /api/explore/:project/full?nodeLimit=500&edgeLimit=1200`
 
-Alteração interna:
+Internal change:
 
-- `search` usa `searchSymbols(...)`;
-- `expand` usa `expandNode(...)`;
-- `full` tenta `analyzeProject(...)` e mantém fallback direto para `getFullGraphExplorer(...)` no caso `.NET`.
+- `search` uses `searchSymbols(...)`;
+- `expand` uses `expandNode(...)`;
+- `full` tries `analyzeProject(...)` and keeps the direct fallback to `getFullGraphExplorer(...)` for `.NET`.
 
-## Garantias atuais
+## Current guarantees
 
-- A UI não foi alterada.
-- Os endpoints existentes continuam com os mesmos paths.
-- `.NET` continua suportado via wrapper e fallback para `symbol-index.js`.
-- `faturas-backend` continua a passar pelo caminho `.NET`.
-- `TypeScript` ainda é suporte inicial, não analyzer completo.
+- The UI has not been changed.
+- Existing endpoints keep the same paths.
+- `.NET` remains supported through the wrapper and fallback to `symbol-index.js`.
+- `faturas-backend` still uses the `.NET` path.
+- `TypeScript` support is still initial; it is not yet a complete analyzer.
 
-## Limitações conhecidas
+## Known limitations
 
-- O analyzer TypeScript ainda não resolve corretamente todos os imports para origem/destino reais; a ligação atual é básica.
-- A deteção TypeScript olha principalmente para ficheiros na raiz (`tsconfig.json`, `.ts` na raiz), podendo precisar de melhoria para monorepos.
-- O grafo TypeScript ainda não inclui chamadas de função, referências sem import direto, exports default ou reexports complexos.
-- A UI ainda não distingue visualmente categorias específicas de frontend.
+- The TypeScript analyzer does not yet resolve every import to the true source and destination symbols; the current linking is basic.
+- TypeScript detection mainly checks files at the root (`tsconfig.json`, `.ts` files at the root), so it may need improvement for monorepos.
+- The TypeScript graph does not yet include function calls, references without a direct import, default exports, or complex reexports.
+- The UI does not yet visually distinguish frontend-specific categories.
 
-## Próximos passos técnicos
+## Technical next steps
 
-1. Melhorar resolução de imports internos para mapear ficheiro origem → símbolo destino.
-2. Suportar `export default`, `export * from`, barrel files e aliases de `tsconfig.paths`.
-3. Adicionar testes dedicados para `analyzer-service` e `typescript-analyzer`.
-4. Testar contra um projeto real React/Next.js.
-5. Expor a análise como tool Hermes ou MCP/plugin separado.
+1. Improve internal import resolution to map source file → target symbol.
+2. Support `export default`, `export * from`, barrel files, and `tsconfig.paths` aliases.
+3. Add dedicated tests for `analyzer-service` and `typescript-analyzer`.
+4. Test against a real React/Next.js project.
+5. Expose the analysis as a Hermes tool or as a separate MCP/plugin.

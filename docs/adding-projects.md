@@ -1,16 +1,16 @@
-# Adicionar projetos
+# Adding projects
 
-[← README](../README.md) · [Implementação](./analyzers-implementation.md) · [Execução](./analyzers-execution.md) · [Integração Hermes](./hermes-tool-integration.md)
+[← README](../README.md) · [Implementation](./analyzers-implementation.md) · [Execution](./analyzers-execution.md) · [Hermes integration](./hermes-tool-integration.md)
 
-## Objetivo
+## Purpose
 
-Este guia explica como adicionar, listar e remover projetos no `hermes-project-map`.
+This guide explains how to add, list, and remove projects in `hermes-project-map`.
 
-Os projetos registados ficam em `data/projects.json` e são lidos pela API através de `src/lib/projects.js`.
+Registered projects are stored in `data/projects.json` and read by the API through `src/lib/projects.js`.
 
-## Como funciona
+## How it works
 
-O `hermes-project-map` não guarda caminhos absolutos dos projetos. Guarda apenas:
+`hermes-project-map` does not store absolute project paths. It stores only:
 
 ```json
 {
@@ -20,36 +20,36 @@ O `hermes-project-map` não guarda caminhos absolutos dos projetos. Guarda apena
 }
 ```
 
-O caminho real é calculado assim:
+The real path is calculated like this:
 
 ```txt
 PROJECTS_ROOT_CONTAINER + relativePath
 ```
 
-Em Docker, o `docker-compose.yml` monta o diretório do host em `/projects`:
+In Docker, `docker-compose.yml` mounts the host directory at `/projects`:
 
 ```yaml
 volumes:
   - "${PROJECTS_ROOT}:/projects:ro"
 ```
 
-Por isso:
+Therefore:
 
 ```txt
 Host:      C:/Users/aiino/Documents/Faturas
 Container: /projects/Faturas
-Registro:  relativePath = "Faturas"
+Record:    relativePath = "Faturas"
 ```
 
-## Configurar `PROJECTS_ROOT`
+## Configure `PROJECTS_ROOT`
 
-Cria o `.env` a partir do exemplo:
+Create `.env` from the example file:
 
 ```powershell
 copy .env.example .env
 ```
 
-Exemplo atual:
+Current example:
 
 ```env
 PROJECTS_ROOT=C:/Users/aiino/Documents
@@ -57,9 +57,9 @@ PORT=8770
 DOTNET_VERSION=10.0
 ```
 
-Todos os projetos adicionados têm de estar dentro de `PROJECTS_ROOT`.
+Every added project must be inside `PROJECTS_ROOT`.
 
-Exemplos válidos:
+Valid examples:
 
 ```txt
 C:/Users/aiino/Documents/Faturas
@@ -67,41 +67,41 @@ C:/Users/aiino/Documents/my-next-app
 C:/Users/aiino/Documents/work/project-a
 ```
 
-Exemplo inválido, se `PROJECTS_ROOT=C:/Users/aiino/Documents`:
+Invalid example when `PROJECTS_ROOT=C:/Users/aiino/Documents`:
 
 ```txt
 D:/Repos/project-a
 ```
 
-Nesse caso, muda `PROJECTS_ROOT` ou move o projeto para dentro da pasta configurada.
+In that case, either change `PROJECTS_ROOT` or move the project into the configured folder.
 
-## Adicionar projeto com script
+## Add a project with the script
 
-Usa o script PowerShell:
+Use the PowerShell script:
 
 ```powershell
 .\scripts\add-hermes-dotnet-project.ps1 -Name "faturas-backend" -Path "C:\Users\aiino\Documents\Faturas"
 ```
 
-Apesar do nome do script conter `dotnet`, o registo é genérico: ele adiciona o projeto ao `data/projects.json`. O analyzer depois deteta se é `.NET`, `TypeScript`, `Node.js`, etc.
+Although the script name contains `dotnet`, registration is generic: it adds the project to `data/projects.json`. The analyzer then detects whether the project is `.NET`, `TypeScript`, `Node.js`, and so on.
 
-### Exemplo TypeScript / Next.js
+### TypeScript / Next.js example
 
 ```powershell
 .\scripts\add-hermes-dotnet-project.ps1 -Name "site-next" -Path "C:\Users\aiino\Documents\site-next"
 ```
 
-Se o projeto tiver `package.json` e `tsconfig.json`, será detetado como `typescript`.
+If the project has both `package.json` and `tsconfig.json`, it will be detected as `typescript`.
 
-## Regras para o nome
+## Naming rules
 
-O nome (`-Name`) tem de cumprir:
+The name (`-Name`) must match:
 
 ```txt
 ^[a-zA-Z0-9][a-zA-Z0-9\-_]*$
 ```
 
-Permitido:
+Allowed:
 
 ```txt
 faturas-backend
@@ -109,7 +109,7 @@ site_next
 Project123
 ```
 
-Não recomendado / inválido:
+Not recommended / invalid:
 
 ```txt
 faturas backend
@@ -117,7 +117,7 @@ faturas backend
 faturas/backend
 ```
 
-## Listar projetos
+## List projects
 
 Via script:
 
@@ -131,7 +131,7 @@ Via API:
 curl http://localhost:8770/api/projects
 ```
 
-## Remover projeto
+## Remove a project
 
 Via script:
 
@@ -139,11 +139,11 @@ Via script:
 .\scripts\remove-hermes-dotnet-project.ps1 -Name "faturas-backend"
 ```
 
-Isto remove apenas o registo de `data/projects.json`. Não apaga a pasta real do projeto.
+This only removes the record from `data/projects.json`. It does not delete the actual project folder.
 
-## Editar manualmente `data/projects.json`
+## Edit `data/projects.json` manually
 
-Também podes editar manualmente:
+You can also edit the file manually:
 
 ```json
 [
@@ -160,58 +160,58 @@ Também podes editar manualmente:
 ]
 ```
 
-Cuidados:
+Be careful:
 
-- o ficheiro tem de ser JSON válido;
-- `relativePath` deve ser relativo a `PROJECTS_ROOT`;
-- não uses caminho absoluto em `relativePath`;
-- não apontes para fora de `PROJECTS_ROOT`.
+- the file must be valid JSON;
+- `relativePath` must be relative to `PROJECTS_ROOT`;
+- do not use an absolute path in `relativePath`;
+- do not point outside `PROJECTS_ROOT`.
 
-## Validar depois de adicionar
+## Validate after adding a project
 
-### 1. Confirmar que aparece na API
+### 1. Confirm that it appears in the API
 
 ```bash
 curl http://localhost:8770/api/projects
 ```
 
-### 2. Confirmar estrutura
+### 2. Confirm the structure
 
 ```bash
 curl http://localhost:8770/api/projects/faturas-backend/structure
 ```
 
-### 3. Pesquisar símbolo
+### 3. Search for a symbol
 
-Para `.NET`:
+For `.NET`:
 
 ```bash
 curl "http://localhost:8770/api/explore/faturas-backend/search?q=InvoiceCreationService"
 ```
 
-Para TypeScript:
+For TypeScript:
 
 ```bash
 curl "http://localhost:8770/api/explore/site-next/search?q=Provider"
 ```
 
-### 4. Obter grafo
+### 4. Retrieve the graph
 
 ```bash
 curl "http://localhost:8770/api/explore/faturas-backend/full?nodeLimit=500&edgeLimit=1200"
 ```
 
-## Usar com Docker
+## Use with Docker
 
-Depois de alterar `.env` ou `data/projects.json`, reinicia o serviço.
+After changing `.env` or `data/projects.json`, restart the service.
 
-Se só alteraste `data/projects.json`:
+If you only changed `data/projects.json`:
 
 ```bash
 docker compose restart
 ```
 
-Se alteraste dependências, Dockerfile ou queres garantir ambiente limpo:
+If you changed dependencies, the Dockerfile, or want to guarantee a clean environment:
 
 ```bash
 docker compose up --build
@@ -219,39 +219,39 @@ docker compose up --build
 
 ## Troubleshooting
 
-### `Pasta do projeto não encontrada no container`
+### `Project folder not found in container`
 
-Causa provável:
+Likely cause:
 
-- `relativePath` não existe dentro de `/projects`;
-- `PROJECTS_ROOT` aponta para a pasta errada;
-- o container não foi reiniciado depois de mudar `.env`.
+- `relativePath` does not exist inside `/projects`;
+- `PROJECTS_ROOT` points to the wrong folder;
+- the container was not restarted after changing `.env`.
 
-Verifica:
+Check:
 
 ```txt
 PROJECTS_ROOT=C:/Users/aiino/Documents
 relativePath=Faturas
 ```
 
-Isto deve mapear para:
+This should map to:
 
 ```txt
 /projects/Faturas
 ```
 
-### `O projeto tem de estar dentro de PROJECTS_ROOT`
+### `The project must be inside PROJECTS_ROOT`
 
-O script bloqueia projetos fora de `PROJECTS_ROOT` para manter o mapeamento Docker simples.
+The script blocks projects outside `PROJECTS_ROOT` to keep the Docker mapping simple.
 
-Solução:
+Solution:
 
-- muda `PROJECTS_ROOT`; ou
-- move o projeto para dentro de `PROJECTS_ROOT`.
+- change `PROJECTS_ROOT`; or
+- move the project inside `PROJECTS_ROOT`.
 
-### Projeto TypeScript aparece vazio
+### TypeScript project appears empty
 
-Verifica se existem ficheiros relevantes fora dos diretórios ignorados:
+Check whether there are relevant files outside ignored directories:
 
 ```txt
 .ts
@@ -260,7 +260,7 @@ Verifica se existem ficheiros relevantes fora dos diretórios ignorados:
 .jsx
 ```
 
-Diretórios ignorados:
+Ignored directories:
 
 ```txt
 node_modules
@@ -270,19 +270,19 @@ build
 coverage
 ```
 
-### Erro de dependência no Docker
+### Dependency error in Docker
 
-Se aparecer algo como `Cannot find package 'ts-morph'`, faz rebuild:
+If you see something like `Cannot find package 'ts-morph'`, rebuild:
 
 ```bash
 docker compose up --build
 ```
 
-## Próximos passos recomendados
+## Recommended next steps
 
-- Renomear futuramente os scripts `*-dotnet-project.ps1` para nomes genéricos, por exemplo:
+- Eventually rename the `*-dotnet-project.ps1` scripts to generic names, for example:
   - `add-hermes-project.ps1`
   - `list-hermes-projects.ps1`
   - `remove-hermes-project.ps1`
-- Adicionar testes para validar `data/projects.json`.
-- Melhorar deteção para monorepos TypeScript com `tsconfig.json` em subpastas.
+- Add tests to validate `data/projects.json`.
+- Improve detection for TypeScript monorepos with `tsconfig.json` in subfolders.

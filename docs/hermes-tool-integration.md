@@ -1,31 +1,31 @@
-# Integração como tool no Hermes
+# Integration as a Hermes tool
 
-[← README](../README.md) · [Adicionar projetos](./adding-projects.md) · [Implementação](./analyzers-implementation.md) · [Execução](./analyzers-execution.md)
+[← README](../README.md) · [Adding projects](./adding-projects.md) · [Implementation](./analyzers-implementation.md) · [Execution](./analyzers-execution.md)
 
-## Objetivo
+## Purpose
 
-Transformar o `hermes-project-map` numa capacidade utilizável diretamente pelo Hermes Agent, para que o agente consiga consultar grafos de projetos sem depender da UI.
+Turn `hermes-project-map` into a capability that Hermes Agent can use directly, so the agent can query project graphs without depending on the UI.
 
-A integração pode ser feita de duas formas:
+The integration can be implemented in two ways:
 
-1. **Tool Hermes local/core** — ferramenta Python registada no Hermes.
-2. **Plugin/MCP separado** — recomendado se o `hermes-project-map` continuar como serviço independente.
+1. **Local/core Hermes tool** — a Python tool registered in Hermes.
+2. **Separate plugin/MCP** — recommended if `hermes-project-map` continues to run as an independent service.
 
-## Opção recomendada
+## Recommended option
 
-Para este caso, a opção mais limpa é manter o `hermes-project-map` como serviço HTTP e criar uma tool Hermes que chama os endpoints existentes.
+For this project, the cleanest option is to keep `hermes-project-map` as an HTTP service and create a Hermes tool that calls the existing endpoints.
 
-Motivos:
+Reasons:
 
-- evita reimplementar análise em Python;
-- preserva o servidor Node.js já existente;
-- permite evoluir UI e API separadamente;
-- a tool Hermes fica pequena e fácil de manter;
-- o mesmo backend serve UI, CLI, Hermes e futuras integrações.
+- avoids reimplementing the analysis in Python;
+- preserves the existing Node.js server;
+- allows the UI and API to evolve independently;
+- keeps the Hermes tool small and easy to maintain;
+- lets the same backend serve the UI, CLI, Hermes, and future integrations.
 
-## Endpoints usados pela tool
+## Endpoints used by the tool
 
-A tool Hermes deve chamar estes endpoints:
+The Hermes tool should call these endpoints:
 
 ```txt
 GET /api/projects
@@ -38,11 +38,11 @@ GET /api/cache/symbols
 DELETE /api/cache/symbols
 ```
 
-## Tools Hermes sugeridas
+## Suggested Hermes tools
 
 ### `project_map_projects`
 
-Lista projetos disponíveis no `hermes-project-map`.
+Lists the projects available in `hermes-project-map`.
 
 Input:
 
@@ -68,7 +68,7 @@ Output:
 
 ### `project_map_structure`
 
-Obtém estrutura de um projeto.
+Gets the structure of a project.
 
 Input:
 
@@ -78,7 +78,7 @@ Input:
 }
 ```
 
-Chama:
+Calls:
 
 ```txt
 GET /api/projects/:name/structure
@@ -86,7 +86,7 @@ GET /api/projects/:name/structure
 
 ### `project_map_search`
 
-Pesquisa símbolos no projeto.
+Searches for symbols in a project.
 
 Input:
 
@@ -97,7 +97,7 @@ Input:
 }
 ```
 
-Chama:
+Calls:
 
 ```txt
 GET /api/explore/:project/search?q=...
@@ -105,7 +105,7 @@ GET /api/explore/:project/search?q=...
 
 ### `project_map_expand`
 
-Expande dependências/referências de um nó.
+Expands the dependencies/references of a node.
 
 Input:
 
@@ -117,7 +117,7 @@ Input:
 }
 ```
 
-Chama:
+Calls:
 
 ```txt
 GET /api/explore/:project/expand?nodeId=...&direction=...
@@ -125,7 +125,7 @@ GET /api/explore/:project/expand?nodeId=...&direction=...
 
 ### `project_map_full_graph`
 
-Obtém grafo completo com limites.
+Gets the full graph with limits.
 
 Input:
 
@@ -139,15 +139,15 @@ Input:
 }
 ```
 
-Chama:
+Calls:
 
 ```txt
 GET /api/explore/:project/full?nodeLimit=...&edgeLimit=...
 ```
 
-## Shape recomendado da tool Python
+## Recommended Python tool shape
 
-Num Hermes core tool ou plugin, a implementação deve ser pequena:
+In a Hermes core tool or plugin, keep the implementation small:
 
 ```python
 import json
@@ -173,9 +173,9 @@ def project_map_search(project: str, query: str) -> str:
     return json.dumps(data, ensure_ascii=False)
 ```
 
-## Registo com `registry.register`
+## Registration with `registry.register`
 
-Exemplo para `project_map_search`:
+Example for `project_map_search`:
 
 ```python
 registry.register(
@@ -207,17 +207,17 @@ registry.register(
 )
 ```
 
-## Configuração Hermes
+## Hermes configuration
 
-### Variável de ambiente
+### Environment variable
 
-Adicionar no ambiente do Hermes:
+Add this to the Hermes environment:
 
 ```bash
 PROJECT_MAP_URL=http://localhost:8770
 ```
 
-Se o Hermes corre noutro container ou host, usar o hostname correto:
+If Hermes runs in another container or host, use the correct hostname:
 
 ```bash
 PROJECT_MAP_URL=http://hermes-project-map:8770
@@ -225,19 +225,19 @@ PROJECT_MAP_URL=http://hermes-project-map:8770
 
 ### Toolset
 
-Adicionar as tools a um toolset dedicado:
+Add the tools to a dedicated toolset:
 
 ```txt
 project_map
 ```
 
-Ou incluir em toolsets existentes apenas quando fizer sentido.
+Alternatively, include them in existing toolsets only where appropriate.
 
-## Alternativa via plugin
+## Plugin alternative
 
-Se não for para mexer no core do Hermes, criar um plugin local é melhor.
+If you do not want to modify Hermes core, creating a local plugin is the better option.
 
-Estrutura sugerida:
+Suggested structure:
 
 ```txt
 ~/.hermes/plugins/project_map/
@@ -246,24 +246,24 @@ Estrutura sugerida:
     project_map_tool.py
 ```
 
-Vantagens:
+Advantages:
 
-- não altera o core Hermes;
-- pode ser ativado/desativado por perfil;
-- facilita testes locais;
-- encaixa melhor se este projeto for específico do teu workflow.
+- does not change Hermes core;
+- can be enabled or disabled per profile;
+- makes local testing easier;
+- fits well if this project is specific to your workflow.
 
-## Alternativa via MCP
+## MCP alternative
 
-Outra opção é expor o `hermes-project-map` como MCP server.
+Another option is to expose `hermes-project-map` as an MCP server.
 
-Quando usar MCP:
+Use MCP when:
 
-- se quiseres consumir a mesma análise por Hermes, Claude Desktop, Cursor ou outros clientes MCP;
-- se quiseres uma interface standard para ferramentas externas;
-- se o project-map evoluir para serviço independente com várias operações.
+- you want to consume the same analysis from Hermes, Claude Desktop, Cursor, or other MCP clients;
+- you want a standard interface for external tools;
+- the project map evolves into an independent service with multiple operations.
 
-Shape conceptual MCP:
+Conceptual MCP shape:
 
 ```txt
 tools/list_projects
@@ -273,21 +273,21 @@ tools/expand_symbol
 tools/full_graph
 ```
 
-## Regras importantes para a tool
+## Important rules for the tool
 
-- A tool deve devolver JSON string válido.
-- Não deve imprimir HTML/texto livre em caso de erro.
-- Deve incluir erros claros quando o serviço não está disponível.
-- Deve ter timeout explícito.
-- Deve validar inputs mínimos (`project`, `query`, `nodeId`).
-- Não deve expor paths locais sensíveis além do que a API já devolve.
-- Deve manter limites por defeito (`nodeLimit`, `edgeLimit`) para não encher contexto.
+- The tool must return a valid JSON string.
+- It must not print HTML or free-form text on error.
+- It must return clear errors when the service is unavailable.
+- It must use an explicit timeout.
+- It must validate minimum inputs (`project`, `query`, `nodeId`).
+- It must not expose sensitive local paths beyond what the API already returns.
+- It must keep default limits (`nodeLimit`, `edgeLimit`) to avoid overfilling context.
 
-## Erros que a tool deve tratar
+## Errors the tool should handle
 
-### Serviço desligado
+### Service unavailable
 
-Mensagem sugerida:
+Suggested message:
 
 ```json
 {
@@ -297,21 +297,21 @@ Mensagem sugerida:
 }
 ```
 
-### Projeto inexistente
+### Project not found
 
-Propagar o erro da API:
+Propagate the API error:
 
 ```json
 {
   "success": false,
   "error": "not_found",
-  "message": "Projeto não encontrado: ..."
+  "message": "Project not found: ..."
 }
 ```
 
-### Resposta demasiado grande
+### Response too large
 
-Aplicar limites:
+Apply limits:
 
 ```json
 {
@@ -320,55 +320,55 @@ Aplicar limites:
 }
 ```
 
-## Critérios de aprovação para implementar a tool
+## Acceptance criteria for implementing the tool
 
-- `project_map_projects` lista projetos reais.
-- `project_map_search` funciona para `faturas-backend`.
-- `project_map_expand` expande um nó obtido pela pesquisa.
-- `project_map_full_graph` respeita `nodeLimit` e `edgeLimit`.
-- Erro de serviço desligado é legível.
-- Toolset pode ser ativado/desativado no Hermes.
-- Não há dependência da UI.
+- `project_map_projects` lists real projects.
+- `project_map_search` works for `faturas-backend`.
+- `project_map_expand` expands a node obtained from search.
+- `project_map_full_graph` respects `nodeLimit` and `edgeLimit`.
+- The service-unavailable error is readable.
+- The toolset can be enabled or disabled in Hermes.
+- There is no dependency on the UI.
 
-## Plano de implementação sugerido
+## Suggested implementation plan
 
-### Commit 1 — plugin/tool mínima
+### Commit 1 — minimal plugin/tool
 
 ```txt
 feat(project-map): add Hermes project map tool
 ```
 
-Inclui:
+Includes:
 
-- cliente HTTP;
+- HTTP client;
 - `project_map_projects`;
 - `project_map_search`;
-- configuração `PROJECT_MAP_URL`.
+- `PROJECT_MAP_URL` configuration.
 
-### Commit 2 — expansão e grafo
+### Commit 2 — expansion and graph
 
 ```txt
 feat(project-map): add expand and full graph tools
 ```
 
-Inclui:
+Includes:
 
 - `project_map_expand`;
 - `project_map_full_graph`;
-- limites e validações.
+- limits and validation.
 
-### Commit 3 — documentação e exemplos
+### Commit 3 — documentation and examples
 
 ```txt
 docs(project-map): document Hermes tool integration
 ```
 
-Inclui:
+Includes:
 
-- exemplos de uso;
+- usage examples;
 - troubleshooting;
-- configuração por Docker/local.
+- Docker/local configuration.
 
-## Próximo passo recomendado
+## Recommended next step
 
-Criar primeiro a tool como plugin local, não no core. Depois de estabilizar o shape dos inputs/outputs, decidir se vale a pena promover para toolset core do Hermes.
+Create the tool as a local plugin first, not in core. After the input/output shape stabilizes, decide whether it is worth promoting to a Hermes core toolset.

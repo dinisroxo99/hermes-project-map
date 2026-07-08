@@ -1,32 +1,32 @@
-# Execução — Project analyzers
+# Execution — Project analyzers
 
-[← README](../README.md) · [Adicionar projetos](./adding-projects.md) · [Implementação](./analyzers-implementation.md) · [Integração Hermes](./hermes-tool-integration.md)
+[← README](../README.md) · [Adding projects](./adding-projects.md) · [Implementation](./analyzers-implementation.md) · [Hermes integration](./hermes-tool-integration.md)
 
-## Objetivo
+## Purpose
 
-Guia operacional para correr, validar e diagnosticar o `hermes-project-map` depois da introdução do `analyzer-service` e do analyzer TypeScript inicial.
+This operational guide explains how to run, validate, and diagnose `hermes-project-map` after the introduction of `analyzer-service` and the initial TypeScript analyzer.
 
-## Pré-requisitos
+## Prerequisites
 
-- Node.js compatível com o projeto.
-- Dependências instaladas com `npm install`.
-- Projetos configurados em `data/projects.json`.
-- Quando usado em Docker, o container tem de incluir as novas dependências (`ts-morph` e `typescript`).
+- A Node.js version compatible with the project.
+- Dependencies installed with `npm install`.
+- Projects configured in `data/projects.json`.
+- When running with Docker, the container must include the new dependencies (`ts-morph` and `typescript`).
 
-## Instalação local
+## Local installation
 
 ```bash
 npm install
 ```
 
-As dependências relevantes para o analyzer TypeScript são:
+The relevant dependencies for the TypeScript analyzer are:
 
 ```txt
 ts-morph
 typescript
 ```
 
-## Validação rápida
+## Quick validation
 
 ### Syntax check
 
@@ -34,45 +34,45 @@ typescript
 npm run check
 ```
 
-Resultado esperado:
+Expected output:
 
 ```txt
 node --check src/server.js && node --check src/public/app.js && node --check src/public/api-client.js
 ```
 
-### Testes
+### Tests
 
 ```bash
 npm test
 ```
 
-Resultado esperado no estado atual:
+Expected result in the current state:
 
 ```txt
 15/15 tests passing
 ```
 
-### Validar import do analyzer-service
+### Validate the `analyzer-service` import
 
-Útil para apanhar erros de paths ESM antes de arrancar o servidor:
+Useful for catching ESM path errors before starting the server:
 
 ```bash
 node -e "import('./src/lib/analyzer-service.js').then(()=>console.log('import ok')).catch(e=>{console.error(e); process.exit(1)})"
 ```
 
-Resultado esperado:
+Expected output:
 
 ```txt
 import ok
 ```
 
-## Arranque local
+## Local startup
 
 ```bash
 npm start
 ```
 
-Por omissão o servidor usa:
+By default, the server uses:
 
 ```txt
 PORT=8770
@@ -84,81 +84,81 @@ Health check:
 curl http://localhost:8770/api/health
 ```
 
-## Execução com Docker
+## Running with Docker
 
-Como foram adicionadas dependências novas, o caminho seguro é rebuildar:
+Because new dependencies were added, the safest path is to rebuild:
 
 ```bash
 docker compose up --build
 ```
 
-Se o projeto estiver com bind mount e as dependências já tiverem sido instaladas dentro do container, um restart pode chegar, mas o rebuild evita erros de módulo ausente.
+If the project uses a bind mount and the dependencies have already been installed inside the container, a restart may be enough. A rebuild is safer because it prevents missing-module errors.
 
-## Endpoints principais
+## Main endpoints
 
-### Listar projetos
+### List projects
 
 ```bash
 curl http://localhost:8770/api/projects
 ```
 
-### Estrutura do projeto
+### Project structure
 
 ```bash
 curl http://localhost:8770/api/projects/<projectName>/structure
 ```
 
-### Pesquisar símbolos
+### Search symbols
 
 ```bash
 curl "http://localhost:8770/api/explore/<projectName>/search?q=InvoiceCreationService"
 ```
 
-Para TypeScript:
+For TypeScript:
 
 ```bash
 curl "http://localhost:8770/api/explore/<projectName>/search?q=Provider"
 ```
 
-### Expandir nó
+### Expand a node
 
 ```bash
 curl "http://localhost:8770/api/explore/<projectName>/expand?nodeId=<nodeId>&direction=both"
 ```
 
-Valores aceites para `direction`:
+Accepted values for `direction`:
 
 - `both`
 - `in`
 - `out`
 
-### Grafo completo
+### Full graph
 
 ```bash
 curl "http://localhost:8770/api/explore/<projectName>/full?nodeLimit=500&edgeLimit=1200"
 ```
 
-Filtros opcionais:
+Optional filters:
 
 ```bash
 curl "http://localhost:8770/api/explore/<projectName>/full?layers=presentation,logic&features=auth,billing"
 ```
 
-## Diagnóstico de erros comuns
+## Diagnosing common errors
 
-### `ERR_MODULE_NOT_FOUND` em `analyzer-service.js`
+### `ERR_MODULE_NOT_FOUND` in `analyzer-service.js`
 
-Sintoma típico:
+Typical symptom:
 
 ```txt
 Cannot find module '/app/src/lib/common/analyzer-detection.js'
 ```
 
-Causa provável:
+Likely cause:
 
-- import relativo errado a partir de `src/lib/analyzer-service.js`.
+- Incorrect relative import from `src/lib/analyzer-service.js`.
 
-Caminhos corretos:
+Correct paths:
 
 ```js
 ../analyzers/common/analyzer-detection.js
@@ -166,63 +166,63 @@ Caminhos corretos:
 ../analyzers/typescript/typescript-analyzer.js
 ```
 
-Validação:
+Validation:
 
 ```bash
 node -e "import('./src/lib/analyzer-service.js').then(()=>console.log('import ok')).catch(e=>{console.error(e); process.exit(1)})"
 ```
 
-### Dependência não encontrada no Docker
+### Missing dependency in Docker
 
-Sintoma:
+Symptom:
 
 ```txt
 Cannot find package 'ts-morph'
 ```
 
-Correção:
+Fix:
 
 ```bash
 docker compose up --build
 ```
 
-ou, dentro do ambiente correto:
+Or, inside the correct environment:
 
 ```bash
 npm install
 ```
 
-### Projeto TypeScript detetado como `nodejs` ou `unknown`
+### TypeScript project detected as `nodejs` or `unknown`
 
-Verificar se o projeto tem pelo menos um destes sinais na raiz:
+Check whether the project root contains at least one of these signals:
 
 - `tsconfig.json`;
-- ficheiro `.ts` na raiz;
-- `package.json` com estrutura JS/TS reconhecida.
+- a `.ts` file at the root;
+- `package.json` with a recognized JS/TS structure.
 
-Nota: a deteção inicial ainda é simples e pode precisar de melhoria para monorepos ou projetos com `tsconfig` em subpastas.
+Note: the initial detection logic is still simple and may need improvement for monorepos or projects with `tsconfig` files in subfolders.
 
-### Grafo vazio para TypeScript
+### Empty TypeScript graph
 
-Possíveis causas:
+Possible causes:
 
-- não existem ficheiros `.ts`, `.tsx`, `.js` ou `.jsx` fora dos diretórios ignorados;
-- o projeto só tem exports default ou reexports ainda não cobertos;
-- os ficheiros estão em paths ignorados (`dist`, `.next`, `build`, etc.);
-- `nodeLimit` demasiado baixo.
+- there are no `.ts`, `.tsx`, `.js`, or `.jsx` files outside ignored directories;
+- the project only uses default exports or reexports that are not covered yet;
+- files are located in ignored paths (`dist`, `.next`, `build`, etc.);
+- `nodeLimit` is too low.
 
-## Checklist antes de dizer que está OK
+## Checklist before confirming that everything is working
 
-1. `npm install` executado no ambiente certo.
-2. `npm run check` passa.
-3. `npm test` passa.
-4. `node -e import('./src/lib/analyzer-service.js')` passa.
-5. Servidor arranca sem `ERR_MODULE_NOT_FOUND`.
-6. Endpoint `.NET` existente continua a responder.
-7. Endpoint TypeScript devolve nodes quando apontado para um projeto TS real.
+1. `npm install` was run in the correct environment.
+2. `npm run check` passes.
+3. `npm test` passes.
+4. `node -e import('./src/lib/analyzer-service.js')` passes.
+5. The server starts without `ERR_MODULE_NOT_FOUND`.
+6. The existing `.NET` endpoint still responds.
+7. The TypeScript endpoint returns nodes when pointed at a real TypeScript project.
 
-## Próximos passos operacionais
+## Operational next steps
 
-- Criar um projeto TypeScript pequeno de teste em `data/projects.json`.
-- Validar `search`, `expand` e `full` com esse projeto.
-- Adicionar testes automatizados para garantir que imports ESM e deteção de tipo não voltam a partir.
+- Create a small test TypeScript project in `data/projects.json`.
+- Validate `search`, `expand`, and `full` against that project.
+- Add automated tests to ensure ESM imports and type detection do not regress.

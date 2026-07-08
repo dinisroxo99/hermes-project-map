@@ -1,53 +1,53 @@
 # Hermes Project Map
 
-Mapa de projetos para explorar estrutura, símbolos e dependências através de uma API local e uma UI web.
+A project map for exploring structure, symbols, and dependencies through a local API and a web UI.
 
-O projeto começou como **Hermes .NET Map** e agora tem uma base incremental para suportar múltiplos tipos de projeto, mantendo o suporte `.NET` atual e adicionando um analyzer TypeScript inicial.
+The project started as **Hermes .NET Map**. It now provides an incremental foundation for supporting multiple project types while preserving the existing `.NET` support and adding an initial TypeScript analyzer.
 
-## Documentação
+## Documentation
 
-- [Como adicionar projetos](./docs/adding-projects.md)
-- [Implementação dos analyzers](./docs/analyzers-implementation.md)
-- [Execução e troubleshooting](./docs/analyzers-execution.md)
-- [Integração como tool no Hermes](./docs/hermes-tool-integration.md)
+- [Adding projects](./docs/adding-projects.md)
+- [Analyzer implementation](./docs/analyzers-implementation.md)
+- [Analyzer execution and troubleshooting](./docs/analyzers-execution.md)
+- [Hermes tool integration](./docs/hermes-tool-integration.md)
 
-## O que faz
+## What it does
 
-- Lista projetos registados em `data/projects.json`.
-- Analisa projetos `.NET` usando o analyzer existente baseado em `symbol-index.js`.
-- Analisa projetos TypeScript/React/Next.js com suporte inicial baseado em `ts-morph`.
-- Expõe endpoints para:
-  - listar projetos;
-  - ver estrutura;
-  - pesquisar símbolos;
-  - expandir dependências/referências;
-  - obter grafo completo.
-- Serve uma UI web estática a partir de `src/public`.
+- Lists projects registered in `data/projects.json`.
+- Analyzes `.NET` projects using the existing analyzer based on `symbol-index.js`.
+- Analyzes TypeScript/React/Next.js projects with initial support based on `ts-morph`.
+- Exposes endpoints to:
+  - list projects;
+  - inspect project structure;
+  - search symbols;
+  - expand dependencies and references;
+  - retrieve the full graph.
+- Serves a static web UI from `src/public`.
 
-## Suporte atual
+## Current support
 
-| Tipo | Estado | Notas |
+| Type | Status | Notes |
 |---|---|---|
-| `.NET` | Suportado | Mantém o caminho antigo via wrapper e fallback para `symbol-index.js`. |
-| `TypeScript` / `React` / `Next.js` | Inicial | Extrai ficheiros, exports, componentes, hooks, providers, interfaces/types e imports internos básicos. |
-| `Node.js` | Detetado | Ainda sem analyzer completo dedicado. |
-| `Python` | Detetado | Ainda sem analyzer dedicado. |
+| `.NET` | Supported | Preserves the previous path through a wrapper and fallback to `symbol-index.js`. |
+| `TypeScript` / `React` / `Next.js` | Initial | Extracts files, exports, components, hooks, providers, interfaces/types, and basic internal imports. |
+| `Node.js` | Detected | Detected, but no dedicated full analyzer yet. |
+| `Python` | Detected | Detected, but no dedicated analyzer yet. |
 
-## Estrutura principal
+## Main structure
 
 ```txt
 src/
-  server.js                         # entrada HTTP
-  routes/                           # rotas da API
+  server.js                         # HTTP entry point
+  routes/                           # API routes
   lib/
-    analyzer-service.js             # dispatcher multi-analyzer
-    projects.js                     # leitura de data/projects.json
-    symbol-index.js                 # analyzer .NET existente
+    analyzer-service.js             # multi-analyzer dispatcher
+    projects.js                     # reads data/projects.json
+    symbol-index.js                 # existing .NET analyzer
   analyzers/
-    common/analyzer-detection.js    # deteção de tipo de projeto
-    dotnet/dotnet-analyzer.js       # wrapper .NET
+    common/analyzer-detection.js    # project-type detection
+    dotnet/dotnet-analyzer.js       # .NET wrapper
     typescript/typescript-analyzer.js
-  public/                           # UI web
+  public/                           # web UI
 scripts/
   add-hermes-dotnet-project.ps1
   list-hermes-dotnet-projects.ps1
@@ -56,33 +56,33 @@ data/
   projects.json
 ```
 
-## Quick start local
+## Local quick start
 
-Instalar dependências:
+Install dependencies:
 
 ```bash
 npm install
 ```
 
-Validar sintaxe:
+Validate syntax:
 
 ```bash
 npm run check
 ```
 
-Correr testes:
+Run tests:
 
 ```bash
 npm test
 ```
 
-Arrancar servidor:
+Start the server:
 
 ```bash
 npm start
 ```
 
-Por omissão:
+By default, the server runs at:
 
 ```txt
 http://localhost:8770
@@ -94,15 +94,15 @@ Health check:
 curl http://localhost:8770/api/health
 ```
 
-## Quick start Docker
+## Docker quick start
 
-Criar `.env`:
+Create `.env`:
 
 ```powershell
 copy .env.example .env
 ```
 
-Exemplo:
+Example:
 
 ```env
 PROJECTS_ROOT=C:/Users/aiino/Documents
@@ -110,29 +110,29 @@ PORT=8770
 DOTNET_VERSION=10.0
 ```
 
-Subir com rebuild:
+Start with a rebuild:
 
 ```bash
 docker compose up --build
 ```
 
-A pasta `PROJECTS_ROOT` é montada no container em `/projects`.
+The `PROJECTS_ROOT` folder is mounted inside the container at `/projects`.
 
-## Adicionar projetos
+## Adding projects
 
-Ver guia completo:
+See the full guide:
 
 - [docs/adding-projects.md](./docs/adding-projects.md)
 
-Exemplo PowerShell:
+PowerShell example:
 
 ```powershell
 .\scripts\add-hermes-dotnet-project.ps1 -Name "faturas-backend" -Path "C:\Users\aiino\Documents\Faturas"
 ```
 
-Apesar do nome do script conter `dotnet`, o registo é genérico. O tipo real é detetado pelo analyzer.
+Although the script name contains `dotnet`, project registration is generic. The actual project type is detected by the analyzer.
 
-## Endpoints principais
+## Main endpoints
 
 ### Health
 
@@ -140,7 +140,7 @@ Apesar do nome do script conter `dotnet`, o registo é genérico. O tipo real é
 GET /api/health
 ```
 
-### Projetos
+### Projects
 
 ```txt
 GET /api/projects
@@ -148,7 +148,7 @@ GET /api/projects/:name
 GET /api/projects/:name/structure
 ```
 
-### Exploração
+### Exploration
 
 ```txt
 GET /api/explore/:project/search?q=...
@@ -156,7 +156,7 @@ GET /api/explore/:project/expand?nodeId=...&direction=both|in|out
 GET /api/explore/:project/full?nodeLimit=500&edgeLimit=1200
 ```
 
-### Indexação e cache
+### Indexing and cache
 
 ```txt
 POST /api/index/:project
@@ -164,29 +164,29 @@ GET /api/cache/symbols
 DELETE /api/cache/symbols
 ```
 
-## Exemplos de uso
+## Usage examples
 
-Pesquisar símbolo `.NET`:
+Search for a `.NET` symbol:
 
 ```bash
 curl "http://localhost:8770/api/explore/faturas-backend/search?q=InvoiceCreationService"
 ```
 
-Pesquisar símbolo TypeScript:
+Search for a TypeScript symbol:
 
 ```bash
 curl "http://localhost:8770/api/explore/site-next/search?q=Provider"
 ```
 
-Obter grafo completo:
+Retrieve the full graph:
 
 ```bash
 curl "http://localhost:8770/api/explore/faturas-backend/full?nodeLimit=500&edgeLimit=1200"
 ```
 
-## Desenvolvimento
+## Development
 
-Comandos npm disponíveis:
+Available npm commands:
 
 ```bash
 npm run check
@@ -194,7 +194,7 @@ npm test
 npm start
 ```
 
-Quando mexeres em imports ESM, valida também:
+When changing ESM imports, also validate the import path directly:
 
 ```bash
 node -e "import('./src/lib/analyzer-service.js').then(()=>console.log('import ok')).catch(e=>{console.error(e); process.exit(1)})"
@@ -204,7 +204,7 @@ node -e "import('./src/lib/analyzer-service.js').then(()=>console.log('import ok
 
 ### `ERR_MODULE_NOT_FOUND`
 
-Verifica imports relativos. Exemplo correto a partir de `src/lib/analyzer-service.js`:
+Check relative imports. Example of correct imports from `src/lib/analyzer-service.js`:
 
 ```js
 ../analyzers/common/analyzer-detection.js
@@ -212,29 +212,29 @@ Verifica imports relativos. Exemplo correto a partir de `src/lib/analyzer-servic
 ../analyzers/typescript/typescript-analyzer.js
 ```
 
-Mais detalhes:
+More details:
 
-- [Execução e troubleshooting](./docs/analyzers-execution.md)
+- [Analyzer execution and troubleshooting](./docs/analyzers-execution.md)
 
-### Dependências novas no Docker
+### New Docker dependencies
 
-Se foram adicionadas dependências npm, faz:
+If npm dependencies were added, rebuild the container:
 
 ```bash
 docker compose up --build
 ```
 
-## Roadmap curto
+## Short-term roadmap
 
-- Melhorar resolução de imports TypeScript.
-- Suportar `export default`, reexports e aliases de `tsconfig.paths`.
-- Adicionar testes para `analyzer-service` e `typescript-analyzer`.
-- Renomear scripts PowerShell para nomes genéricos sem `dotnet`.
-- Criar tool Hermes ou plugin para consumir esta API diretamente.
+- Improve TypeScript import resolution.
+- Support `export default`, reexports, and `tsconfig.paths` aliases.
+- Add tests for `analyzer-service` and `typescript-analyzer`.
+- Rename the PowerShell scripts to generic names without `dotnet`.
+- Create a Hermes tool or plugin that consumes this API directly.
 
-## Navegação
+## Navigation
 
-- [Como adicionar projetos](./docs/adding-projects.md)
-- [Implementação dos analyzers](./docs/analyzers-implementation.md)
-- [Execução e troubleshooting](./docs/analyzers-execution.md)
-- [Integração como tool no Hermes](./docs/hermes-tool-integration.md)
+- [Adding projects](./docs/adding-projects.md)
+- [Analyzer implementation](./docs/analyzers-implementation.md)
+- [Analyzer execution and troubleshooting](./docs/analyzers-execution.md)
+- [Hermes tool integration](./docs/hermes-tool-integration.md)
