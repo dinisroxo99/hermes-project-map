@@ -1,5 +1,7 @@
 # Integração como tool no Hermes
 
+[← README](../README.md) · [Adicionar projetos](./adding-projects.md) · [Implementação](./analyzers-implementation.md) · [Execução](./analyzers-execution.md)
+
 ## Objetivo
 
 Transformar o `hermes-project-map` numa capacidade utilizável diretamente pelo Hermes Agent, para que o agente consiga consultar grafos de projetos sem depender da UI.

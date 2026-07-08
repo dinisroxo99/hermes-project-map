@@ -1,5 +1,7 @@
 # Execução — Project analyzers
 
+[← README](../README.md) · [Adicionar projetos](./adding-projects.md) · [Implementação](./analyzers-implementation.md) · [Integração Hermes](./hermes-tool-integration.md)
+
 ## Objetivo
 
 Guia operacional para correr, validar e diagnosticar o `hermes-project-map` depois da introdução do `analyzer-service` e do analyzer TypeScript inicial.

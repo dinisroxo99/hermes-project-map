@@ -1,5 +1,7 @@
 # Implementação — Multi-project analyzers
 
+[← README](../README.md) · [Adicionar projetos](./adding-projects.md) · [Execução](./analyzers-execution.md) · [Integração Hermes](./hermes-tool-integration.md)
+
 ## Objetivo
 
 Criar uma base mínima para o `hermes-project-map` suportar múltiplos tipos de projeto sem quebrar o suporte .NET existente.
