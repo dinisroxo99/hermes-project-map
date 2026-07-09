@@ -1,5 +1,5 @@
 /**
- * Hermes .NET Map — server entry point
+ * Hermes Project Map — server entry point
  *
  * Lightweight orchestrator: router dispatch, static serving, error handling.
  * All API routes are registered via src/routes/*.routes.js
@@ -121,5 +121,5 @@ const server = http.createServer(async (req, res) => {
 });
 
 server.listen(PORT, "0.0.0.0", () => {
-  console.log(`Hermes .NET Map ativo em http://localhost:${PORT}`);
+  console.log(`Hermes Project Map ativo em http://localhost:${PORT}`);
 });

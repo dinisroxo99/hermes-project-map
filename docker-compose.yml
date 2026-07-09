@@ -1,10 +1,10 @@
 services:
-  hermes-dotnet-map:
+  hermes-project-map:
     build:
       context: .
       args:
         DOTNET_VERSION: ${DOTNET_VERSION:-10.0}
-    container_name: hermes-dotnet-map
+    container_name: hermes-project-map
     ports:
       - "${PORT:-8770}:8770"
     environment:

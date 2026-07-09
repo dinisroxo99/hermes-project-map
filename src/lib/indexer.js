@@ -38,7 +38,7 @@ function run(command) {
 
 export async function runScipIndex(project) {
   const src = project.absolutePath;
-  const workDir = `/tmp/hermes-dotnet-map/${project.name}`;
+  const workDir = `/tmp/hermes-project-map/${project.name}`;
   const outDir = path.join(DATA_DIR, "indexes", project.name);
 
   fs.mkdirSync(outDir, { recursive: true });
