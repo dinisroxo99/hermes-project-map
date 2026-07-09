@@ -80,15 +80,15 @@ In that case, either change `PROJECTS_ROOT` or move the project into the configu
 Use the PowerShell script:
 
 ```powershell
-.\scripts\add-hermes-dotnet-project.ps1 -Name "faturas-backend" -Path "C:\Users\aiino\Documents\Faturas"
+.\scripts\add-hermes-project.ps1 -Name "faturas-backend" -Path "C:\Users\aiino\Documents\Faturas"
 ```
 
-Although the script name contains `dotnet`, registration is generic: it adds the project to `data/projects.json`. The analyzer then detects whether the project is `.NET`, `TypeScript`, `Node.js`, and so on.
+Registration is generic: it adds the project to `data/projects.json`. The analyzer then detects whether the project is `.NET`, `TypeScript`, `Node.js`, and so on.
 
 ### TypeScript / Next.js example
 
 ```powershell
-.\scripts\add-hermes-dotnet-project.ps1 -Name "site-next" -Path "C:\Users\aiino\Documents\site-next"
+.\scripts\add-hermes-project.ps1 -Name "site-next" -Path "C:\Users\aiino\Documents\site-next"
 ```
 
 If the project has both `package.json` and `tsconfig.json`, it will be detected as `typescript`.
@@ -122,7 +122,7 @@ faturas/backend
 Via script:
 
 ```powershell
-.\scripts\list-hermes-dotnet-projects.ps1
+.\scripts\list-hermes-projects.ps1
 ```
 
 Via API:
@@ -136,7 +136,7 @@ curl http://localhost:8770/api/projects
 Via script:
 
 ```powershell
-.\scripts\remove-hermes-dotnet-project.ps1 -Name "faturas-backend"
+.\scripts\remove-hermes-project.ps1 -Name "faturas-backend"
 ```
 
 This only removes the record from `data/projects.json`. It does not delete the actual project folder.
@@ -280,9 +280,5 @@ docker compose up --build
 
 ## Recommended next steps
 
-- Eventually rename the `*-dotnet-project.ps1` scripts to generic names, for example:
-  - `add-hermes-project.ps1`
-  - `list-hermes-projects.ps1`
-  - `remove-hermes-project.ps1`
 - Add tests to validate `data/projects.json`.
 - Improve detection for TypeScript monorepos with `tsconfig.json` in subfolders.

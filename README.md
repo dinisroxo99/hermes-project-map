@@ -2,7 +2,7 @@
 
 A project map for exploring structure, symbols, and dependencies through a local API and a web UI.
 
-The project started as **Hermes .NET Map**. It now provides an incremental foundation for supporting multiple project types while preserving the existing `.NET` support and adding an initial TypeScript analyzer.
+The project provides an incremental foundation for supporting multiple project types while preserving `.NET` support and adding an initial TypeScript analyzer.
 
 ## Documentation
 
@@ -49,9 +49,9 @@ src/
     typescript/typescript-analyzer.js
   public/                           # web UI
 scripts/
-  add-hermes-dotnet-project.ps1
-  list-hermes-dotnet-projects.ps1
-  remove-hermes-dotnet-project.ps1
+  add-hermes-project.ps1
+  list-hermes-projects.ps1
+  remove-hermes-project.ps1
 data/
   projects.json
 ```
@@ -127,10 +127,10 @@ See the full guide:
 PowerShell example:
 
 ```powershell
-.\scripts\add-hermes-dotnet-project.ps1 -Name "faturas-backend" -Path "C:\Users\aiino\Documents\Faturas"
+.\scripts\add-hermes-project.ps1 -Name "faturas-backend" -Path "C:\Users\aiino\Documents\Faturas"
 ```
 
-Although the script name contains `dotnet`, project registration is generic. The actual project type is detected by the analyzer.
+Project registration is generic. The actual project type is detected by the analyzer.
 
 ## Main endpoints
 
@@ -229,7 +229,6 @@ docker compose up --build
 - Improve TypeScript import resolution.
 - Support `export default`, reexports, and `tsconfig.paths` aliases.
 - Add tests for `analyzer-service` and `typescript-analyzer`.
-- Rename the PowerShell scripts to generic names without `dotnet`.
 - Create a Hermes tool or plugin that consumes this API directly.
 
 ## Navigation
