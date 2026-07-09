@@ -11,7 +11,7 @@ import {
 } from "../src/lib/project-structure.js";
 
 function makeTempProject() {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "hermes-dotnet-map-"));
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "hermes-project-map-"));
 
   fs.writeFileSync(path.join(root, "Faturas.sln"), "Microsoft Visual Studio Solution File, Format Version 12.00\n");
 
