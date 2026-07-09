@@ -97,3 +97,33 @@ test("analyzeTypeScriptProject detects anonymous default component exports from 
   assert.equal(result.success, true);
   assert.ok(result.nodes.some((node) => node.label === "InvoiceList"));
 });
+
+test("analyzeTypeScriptProject connects default import aliases to default exports", () => {
+  const root = makeTempTypeScriptProject();
+  const srcDir = path.join(root, "src");
+  fs.mkdirSync(srcDir, { recursive: true });
+
+  fs.writeFileSync(
+    path.join(srcDir, "invoice-list.tsx"),
+    "export default function InvoiceList() { return null; }\n"
+  );
+
+  fs.writeFileSync(
+    path.join(srcDir, "app.tsx"),
+    "import List from './invoice-list';\nexport function App() { return List; }\n"
+  );
+
+  const result = analyzeTempProject(root);
+  const app = result.nodes.find((node) => node.label === "App");
+  const invoiceList = result.nodes.find((node) => node.label === "InvoiceList");
+
+  assert.equal(result.success, true);
+  assert.ok(app);
+  assert.ok(invoiceList);
+  assert.ok(result.edges.some((edge) =>
+    edge.from === app.id &&
+    edge.to === invoiceList.id &&
+    edge.relation === "imports" &&
+    edge.label === "importa default"
+  ));
+});
