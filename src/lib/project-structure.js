@@ -1,4 +1,5 @@
 import path from "node:path";
+import { detectProjectType } from "../analyzers/common/analyzer-detection.js";
 import { findFiles, readText, relative } from "../utils/fs-utils.js";
 
 const LAYER_ORDER = ["API", "Application", "Domain", "Infrastructure", "Tests", "Other"];
@@ -69,6 +70,10 @@ const ARCHITECTURE_SEGMENTS = new Set([
  * @param {{name:string, absolutePath:string}} project
  */
 export function analyzeProjectStructure(project) {
+  if (detectProjectType(project.absolutePath) === "typescript") {
+    return analyzeTypeScriptProjectStructure(project);
+  }
+
   const slnFiles = [
     ...findFiles(project.absolutePath, ".sln"),
     ...findFiles(project.absolutePath, ".slnx")
@@ -182,6 +187,109 @@ export function analyzeProjectStructure(project) {
     canSubdivide: projects.length > 1 || features.length > 1,
     suggestedModes: buildSuggestedModes(projects, features)
   };
+}
+
+function analyzeTypeScriptProjectStructure(project) {
+  const sourceFiles = [
+    ...findFiles(project.absolutePath, ".ts"),
+    ...findFiles(project.absolutePath, ".tsx"),
+    ...findFiles(project.absolutePath, ".js"),
+    ...findFiles(project.absolutePath, ".jsx")
+  ]
+    .filter((file) => !file.toLowerCase().endsWith(".d.ts"))
+    .sort();
+
+  const layerMap = new Map();
+  const featureMap = new Map();
+
+  for (const file of sourceFiles) {
+    const relativeFile = relative(project.absolutePath, file);
+    const layer = inferTypeScriptLayer(relativeFile);
+    const feature = inferTypeScriptFeature(relativeFile);
+
+    if (!layerMap.has(layer)) {
+      layerMap.set(layer, {
+        name: layer,
+        projectCount: 1,
+        projects: [project.name],
+        sourceFileCount: 0
+      });
+    }
+    layerMap.get(layer).sourceFileCount += 1;
+
+    if (!featureMap.has(feature)) {
+      featureMap.set(feature, {
+        name: feature,
+        symbolCount: 0,
+        projectNames: new Set([project.name]),
+        layers: new Set()
+      });
+    }
+
+    const featureInfo = featureMap.get(feature);
+    featureInfo.symbolCount += 1;
+    featureInfo.layers.add(layer);
+  }
+
+  const layers = Array.from(layerMap.values())
+    .sort((a, b) => a.name.localeCompare(b.name));
+  const features = Array.from(featureMap.values())
+    .map((feature) => ({
+      name: feature.name,
+      symbolCount: feature.symbolCount,
+      projectNames: Array.from(feature.projectNames).sort(),
+      layers: Array.from(feature.layers).sort()
+    }))
+    .sort((a, b) => b.symbolCount - a.symbolCount || a.name.localeCompare(b.name));
+
+  return {
+    project: project.name,
+    projectType: "typescript",
+    rootPath: project.absolutePath,
+    solution: {
+      name: project.name,
+      path: "package.json",
+      count: 1
+    },
+    projects: [{
+      name: project.name,
+      layer: "frontend",
+      path: "package.json",
+      directory: ".",
+      sourceFileCount: sourceFiles.length,
+      featureCount: features.length
+    }],
+    layers,
+    features,
+    canSubdivide: layers.length > 1 || features.length > 1,
+    suggestedModes: buildSuggestedModes([{ name: project.name }], features)
+  };
+}
+
+function inferTypeScriptLayer(relativeFile) {
+  const pathLower = `/${relativeFile.toLowerCase()}`;
+
+  if (pathLower.includes("/components/")) return "presentation";
+  if (pathLower.includes("/hooks/")) return "logic";
+  if (pathLower.includes("/utils/") || pathLower.includes("/lib/")) return "common";
+  if (pathLower.includes("/services/") || pathLower.includes("/api/")) return "services";
+  if (pathLower.includes("/types/") || pathLower.includes("/interfaces/")) return "types";
+
+  return "unknown";
+}
+
+function inferTypeScriptFeature(relativeFile) {
+  const parts = relativeFile.split("/");
+  const commonDirs = new Set(["src", "app", "pages", "components", "hooks", "utils", "lib", "types", "features"]);
+
+  for (const part of parts) {
+    if (part.includes(".")) continue;
+    if (!commonDirs.has(part.toLowerCase())) {
+      return part;
+    }
+  }
+
+  return "shared";
 }
 
 export function inferLayerFromProjectName(projectName) {
