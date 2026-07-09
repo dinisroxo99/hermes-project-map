@@ -224,6 +224,7 @@ function extractSymbols(sourceFile, relativePath, context) {
     }));
   }
 
+  extractDefaultExportSymbols(sourceFile, relativePath, fileName, context);
   extractRegexSymbols(sourceText, relativePath, fileName, context);
 }
 
@@ -255,6 +256,86 @@ function extractRegexSymbols(sourceText, relativePath, fileName, context) {
       category: 'hook'
     }));
   }
+}
+
+
+// Default exports with named declarations can already be seen by class/function scans.
+// Register through the normal symbol path so existing dedupe keeps one node per file/name.
+function extractDefaultExportSymbols(sourceFile, relativePath, fileName, context) {
+  const defaultSymbol = sourceFile.getDefaultExportSymbol?.();
+
+  if (!defaultSymbol) {
+    return;
+  }
+
+  const declarations = defaultSymbol.getDeclarations?.() || [];
+
+  for (const declaration of declarations) {
+    const name = inferDefaultExportName(declaration, relativePath);
+
+    if (!name) {
+      continue;
+    }
+
+    const kind = inferDefaultExportKind(declaration, name);
+
+    registerSymbol(context, relativePath, createNode({
+      name,
+      kind,
+      relativePath,
+      fileName,
+      start: declaration.getStart?.() || 0,
+      category: classifyNode(name, kind)
+    }));
+  }
+}
+
+function inferDefaultExportName(declaration, relativePath) {
+  const namedDeclarationName = declaration.getName?.();
+
+  if (namedDeclarationName) {
+    return namedDeclarationName;
+  }
+
+  const symbolName = declaration.getSymbol?.()?.getName?.();
+
+  if (symbolName && symbolName !== "default") {
+    return symbolName;
+  }
+
+  return inferNameFromFilePath(relativePath);
+}
+
+function inferNameFromFilePath(relativePath) {
+  const baseName = path.basename(relativePath).replace(/\.(tsx?|jsx?)$/, "");
+
+  return baseName
+    .split(/[^A-Za-z0-9]+/)
+    .filter(Boolean)
+    .map((part) => `${part.charAt(0).toUpperCase()}${part.slice(1)}`)
+    .join("") || "DefaultExport";
+}
+
+function inferDefaultExportKind(declaration, name) {
+  const kindName = declaration.getKindName?.() || "";
+
+  if (kindName.includes("Class")) {
+    return "class";
+  }
+
+  if (kindName.includes("Function")) {
+    return isHookName(name) ? "hook" : "function";
+  }
+
+  if (kindName.includes("Interface")) {
+    return "interface";
+  }
+
+  if (kindName.includes("TypeAlias")) {
+    return "type";
+  }
+
+  return isHookName(name) ? "hook" : "component";
 }
 
 function registerSymbol(context, relativePath, node) {
