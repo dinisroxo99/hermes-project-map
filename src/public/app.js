@@ -22,6 +22,11 @@ const graph2dEl = document.getElementById("graph2d");
 const graph3dEl = document.getElementById("graph3d");
 const view2dBtn = document.getElementById("view2dBtn");
 const view3dBtn = document.getElementById("view3dBtn");
+const categoryFilterSummaryEl = document.getElementById("categoryFilterSummary");
+const threeDControlsEl = document.getElementById("threeDControls");
+const zoomIn3dBtn = document.getElementById("zoomIn3dBtn");
+const zoomOut3dBtn = document.getElementById("zoomOut3dBtn");
+const reset3dBtn = document.getElementById("reset3dBtn");
 
 const CATEGORY = {
   controller: { label: "Controller/API", color: "#60a5fa" },
@@ -37,8 +42,46 @@ const CATEGORY = {
   middleware: { label: "Middleware", color: "#38bdf8" },
   extension: { label: "Extension", color: "#94a3b8" },
   api: { label: "API", color: "#3b82f6" },
+  component: { label: "Component", color: "#ec4899" },
+  hook: { label: "Hook", color: "#14b8a6" },
+  provider: { label: "Provider", color: "#8b5cf6" },
+  context: { label: "Context", color: "#06b6d4" },
+  type: { label: "Type", color: "#facc15" },
+  symbol: { label: "Symbol", color: "#94a3b8" },
   unknown: { label: "Outro", color: "#64748b" }
 };
+
+const DOTNET_CATEGORIES = [
+  "controller",
+  "api",
+  "service",
+  "application",
+  "domain",
+  "interface",
+  "repository",
+  "database",
+  "infrastructure",
+  "contract",
+  "enum",
+  "middleware",
+  "extension",
+  "unknown"
+];
+
+const TYPESCRIPT_CATEGORIES = [
+  "component",
+  "hook",
+  "provider",
+  "context",
+  "interface",
+  "type",
+  "service",
+  "api",
+  "symbol",
+  "unknown"
+];
+
+const DEFAULT_CATEGORIES = Object.keys(CATEGORY);
 
 const activeCategories = new Set(Object.keys(CATEGORY));
 const activeLayers = new Set();
@@ -59,6 +102,7 @@ let last3DClick = {
 // Performance Maps for 3D graph incremental updates
 const graphNodesById = new Map();
 const graphLinksById = new Map();
+const projectsByName = new Map();
 
 function initGraph() {
   cy = cytoscape({
@@ -66,7 +110,6 @@ function initGraph() {
     elements: [],
     minZoom: 0.08,
     maxZoom: 3,
-    wheelSensitivity: 0.18,
     style: [
       {
         selector: "node",
@@ -257,11 +300,13 @@ function initGraph3D() {
   // Left-click drag = rotate, Scroll = zoom, Right-click/Shift+drag = pan
   const controls = graph3d.controls();
   if (controls) {
+    controls.enabled = true;
     controls.enableDamping = true;
     controls.dampingFactor = 0.08;
     controls.enablePan = true;
     controls.enableRotate = true;
     controls.enableZoom = true;
+    controls.screenSpacePanning = true;
     controls.rotateSpeed = 0.6;
     controls.zoomSpeed = 1.2;
     controls.panSpeed = 0.8;
@@ -269,6 +314,12 @@ function initGraph3D() {
     controls.maxDistance = 5000;
     controls.autoRotate = false;
     controls.autoRotateSpeed = 0.3;
+
+    if (controls.mouseButtons && window.THREE?.MOUSE) {
+      controls.mouseButtons.LEFT = window.THREE.MOUSE.ROTATE;
+      controls.mouseButtons.MIDDLE = window.THREE.MOUSE.DOLLY;
+      controls.mouseButtons.RIGHT = window.THREE.MOUSE.PAN;
+    }
   }
 
   // Handle container resize
@@ -423,12 +474,123 @@ function focus3DNode(nodeId) {
   );
 }
 
+function get3DCameraTarget() {
+  const controls = graph3d?.controls?.();
+  const target = controls?.target;
+
+  return {
+    x: target?.x || 0,
+    y: target?.y || 0,
+    z: target?.z || 0
+  };
+}
+
+function get3DCameraPosition() {
+  const camera = graph3d?.cameraPosition?.() || {};
+
+  return {
+    x: Number(camera.x || 0),
+    y: Number(camera.y || 0),
+    z: Number(camera.z || 1200)
+  };
+}
+
+function zoom3D(factor) {
+  if (!graph3d || viewMode !== "3d") return;
+
+  const target = get3DCameraTarget();
+  const camera = get3DCameraPosition();
+  const next = {
+    x: target.x + (camera.x - target.x) * factor,
+    y: target.y + (camera.y - target.y) * factor,
+    z: target.z + (camera.z - target.z) * factor
+  };
+
+  graph3d.cameraPosition(next, target, 350);
+  statusEl.textContent = factor < 1 ? "3D: zoom in." : "3D: zoom out.";
+}
+
+function reset3DView() {
+  if (!graph3d || viewMode !== "3d") return;
+
+  graph3d.zoomToFit(650, 90);
+  statusEl.textContent = "3D: vista reajustada.";
+}
+
+function set3DAxisView(axisPlane) {
+  if (!graph3d || viewMode !== "3d") return;
+
+  const distance = get3DDistance();
+  const positions = {
+    xy: { x: 0, y: 0, z: distance },
+    xz: { x: 0, y: -distance, z: 0 },
+    yz: { x: distance, y: 0, z: 0 }
+  };
+
+  graph3d.cameraPosition(positions[axisPlane] || positions.xy, { x: 0, y: 0, z: 0 }, 650);
+  statusEl.textContent = `3D: vista ${axisPlane.toUpperCase()} ativa.`;
+}
+
+function rotate3DAroundAxis(axis) {
+  if (!graph3d || viewMode !== "3d") return;
+
+  const target = get3DCameraTarget();
+  const camera = get3DCameraPosition();
+  const relative = {
+    x: camera.x - target.x,
+    y: camera.y - target.y,
+    z: camera.z - target.z
+  };
+  const rotated = rotateVector(relative, axis, Math.PI / 8);
+
+  graph3d.cameraPosition({
+    x: target.x + rotated.x,
+    y: target.y + rotated.y,
+    z: target.z + rotated.z
+  }, target, 420);
+  statusEl.textContent = `3D: rotação no eixo ${axis.toUpperCase()}.`;
+}
+
+function get3DDistance() {
+  const camera = get3DCameraPosition();
+  const target = get3DCameraTarget();
+  return Math.max(420, Math.hypot(camera.x - target.x, camera.y - target.y, camera.z - target.z) || 1200);
+}
+
+function rotateVector(vector, axis, angle) {
+  const cos = Math.cos(angle);
+  const sin = Math.sin(angle);
+
+  if (axis === "x") {
+    return {
+      x: vector.x,
+      y: vector.y * cos - vector.z * sin,
+      z: vector.y * sin + vector.z * cos
+    };
+  }
+
+  if (axis === "y") {
+    return {
+      x: vector.x * cos + vector.z * sin,
+      y: vector.y,
+      z: -vector.x * sin + vector.z * cos
+    };
+  }
+
+  return {
+    x: vector.x * cos - vector.y * sin,
+    y: vector.x * sin + vector.y * cos,
+    z: vector.z
+  };
+}
+
 function setViewMode(mode) {
   viewMode = mode;
 
   if (mode === "3d") {
     graph2dEl.classList.add("hidden");
     graph3dEl.classList.remove("hidden");
+    threeDControlsEl?.classList.remove("hidden");
 
     view2dBtn.classList.remove("active-view");
     view3dBtn.classList.add("active-view");
@@ -446,6 +608,7 @@ function setViewMode(mode) {
   }
 
   graph3dEl.classList.add("hidden");
+  threeDControlsEl?.classList.add("hidden");
   graph2dEl.classList.remove("hidden");
 
   view3dBtn.classList.remove("active-view");
@@ -457,11 +620,17 @@ async function loadProjects() {
   const data = await fetchJson("/api/projects");
 
   projectSelect.innerHTML = "";
+  projectsByName.clear();
 
   for (const project of data.projects) {
+    projectsByName.set(project.name, project);
+
     const option = document.createElement("option");
     option.value = project.name;
-    option.textContent = `${project.name} (${project.csprojCount} csproj)`;
+    option.textContent = formatProjectOption(project);
+    option.title = project.exists
+      ? project.absolutePath || project.relativePath || project.name
+      : `Pasta não encontrada: ${project.absolutePath || project.relativePath || project.name}`;
     projectSelect.appendChild(option);
   }
 
@@ -472,6 +641,25 @@ async function loadProjects() {
   if (projectSelect.value) {
     await loadProjectStructure(projectSelect.value);
   }
+}
+
+function formatProjectOption(project) {
+  const type = project.typeLabel || project.projectType || "Desconhecido";
+  const details = [];
+
+  if (project.csprojCount || project.slnCount) {
+    details.push(`${project.csprojCount || 0} csproj`, `${project.slnCount || 0} sln`);
+  }
+
+  if (project.sourceFileCount) {
+    details.push(`${project.sourceFileCount} source`);
+  }
+
+  if (!project.exists) {
+    details.push("pasta em falta");
+  }
+
+  return `${project.name} (${[type, ...details].join(" · ")})`;
 }
 
 async function loadProjectStructure(projectName) {
@@ -492,6 +680,7 @@ async function loadProjectStructure(projectName) {
   try {
     currentStructure = await fetchJson(`/api/projects/${encodeURIComponent(projectName)}/structure`);
     renderStructureFilters(currentStructure);
+    renderCategoryFilters();
     applyCategoryFilters();
   } catch (error) {
     if (structureSummaryEl) {
@@ -1165,9 +1354,38 @@ function updateStats() {
   }
 }
 
+function getVisibleCategoryKeys(projectType = getActiveProjectType()) {
+  if (projectType === "dotnet") {
+    return DOTNET_CATEGORIES;
+  }
+
+  if (projectType === "typescript") {
+    return TYPESCRIPT_CATEGORIES;
+  }
+
+  return DEFAULT_CATEGORIES;
+}
+
+function getActiveProjectType() {
+  if (currentStructure?.projectType) {
+    return currentStructure.projectType;
+  }
+
+  const selectedProject = projectsByName.get(projectSelect.value);
+  return selectedProject?.projectType || "unknown";
+}
+
+function getProjectTypeLabel(projectType = getActiveProjectType()) {
+  if (projectType === "dotnet") return ".NET";
+  if (projectType === "typescript") return "TypeScript";
+  if (projectType === "nodejs") return "Node.js";
+  return "Auto";
+}
+
 function renderLegend() {
-  legendItems.innerHTML = Object.entries(CATEGORY)
-    .map(([key, item]) => {
+  legendItems.innerHTML = getVisibleCategoryKeys()
+    .map((key) => {
+      const item = CATEGORY[key];
       return `
         <div class="legend-item">
           <span class="legend-color" style="background:${item.color}"></span>
@@ -1254,10 +1472,23 @@ function renderCategoryFilters() {
     return;
   }
 
-  categoryFiltersEl.innerHTML = Object.entries(CATEGORY)
-    .map(([key, item]) => {
+  const projectType = getActiveProjectType();
+  const categoryKeys = getVisibleCategoryKeys(projectType);
+
+  activeCategories.clear();
+  for (const key of categoryKeys) {
+    activeCategories.add(key);
+  }
+
+  if (categoryFilterSummaryEl) {
+    categoryFilterSummaryEl.textContent = getProjectTypeLabel(projectType);
+  }
+
+  categoryFiltersEl.innerHTML = categoryKeys
+    .map((key) => {
+      const item = CATEGORY[key];
       return `
-        <label class="category-filter">
+        <label class="category-filter compact-filter">
           <input type="checkbox" value="${escapeAttribute(key)}" checked />
           <span class="legend-color" style="background:${item.color}"></span>
           <span>${escapeHtml(item.label)}</span>
@@ -1277,6 +1508,8 @@ function renderCategoryFilters() {
       applyCategoryFilters();
     });
   });
+
+  renderLegend();
 }
 
 function escapeHtml(value) {
@@ -1361,6 +1594,30 @@ view2dBtn.addEventListener("click", () => {
 
 view3dBtn.addEventListener("click", () => {
   setViewMode("3d");
+});
+
+zoomIn3dBtn?.addEventListener("click", () => {
+  zoom3D(0.72);
+});
+
+zoomOut3dBtn?.addEventListener("click", () => {
+  zoom3D(1.35);
+});
+
+reset3dBtn?.addEventListener("click", () => {
+  reset3DView();
+});
+
+document.querySelectorAll("[data-3d-view]").forEach((button) => {
+  button.addEventListener("click", () => {
+    set3DAxisView(button.getAttribute("data-3d-view"));
+  });
+});
+
+document.querySelectorAll("[data-3d-axis]").forEach((button) => {
+  button.addEventListener("click", () => {
+    rotate3DAroundAxis(button.getAttribute("data-3d-axis"));
+  });
 });
 
 initGraph();
