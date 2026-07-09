@@ -58,6 +58,7 @@ export function analyzeTypeScriptProject(project, options = {}) {
     const seenNodeKeys = new Set();
     const symbolsByName = new Map();
     const fileSymbolsByPath = new Map();
+    const defaultSymbolByPath = new Map();
     const sourceFiles = tsProject.getSourceFiles().filter((sourceFile) => {
       const relativePath = normalizeRelativePath(rootPath, sourceFile.getFilePath());
       return !shouldIgnorePath(relativePath);
@@ -69,7 +70,8 @@ export function analyzeTypeScriptProject(project, options = {}) {
         nodes,
         seenNodeKeys,
         symbolsByName,
-        fileSymbolsByPath
+        fileSymbolsByPath,
+        defaultSymbolByPath
       });
     }
 
@@ -78,7 +80,8 @@ export function analyzeTypeScriptProject(project, options = {}) {
       extractImportEdges(sourceFile, relativePath, {
         edges,
         symbolsByName,
-        fileSymbolsByPath
+        fileSymbolsByPath,
+        defaultSymbolByPath
       });
     }
 
@@ -261,6 +264,7 @@ function extractRegexSymbols(sourceText, relativePath, fileName, context) {
 
 // Default exports with named declarations can already be seen by class/function scans.
 // Register through the normal symbol path so existing dedupe keeps one node per file/name.
+// Keep the exported symbol by file so default imports can resolve aliases like `import List from './invoice-list'`.
 function extractDefaultExportSymbols(sourceFile, relativePath, fileName, context) {
   const defaultSymbol = sourceFile.getDefaultExportSymbol?.();
 
@@ -278,16 +282,31 @@ function extractDefaultExportSymbols(sourceFile, relativePath, fileName, context
     }
 
     const kind = inferDefaultExportKind(declaration, name);
+    
+    const node = createNode({name, kind, relativePath, fileName, 
+      start: declaration.getStart?.() || 0, category: classifyNode(name, kind)});
 
-    registerSymbol(context, relativePath, createNode({
-      name,
-      kind,
-      relativePath,
-      fileName,
-      start: declaration.getStart?.() || 0,
-      category: classifyNode(name, kind)
-    }));
+    registerSymbol(context, relativePath, node);
+    context.defaultSymbolByPath?.set(relativePath, node);
   }
+}
+
+function resolveRelativeImportPath(fromRelativePath, moduleSpecifier, knownPaths) {
+  const fromDir = path.dirname(fromRelativePath);
+  const normalizedBase = path.normalize(path.join(fromDir, moduleSpecifier)).replace(/\\/g, '/');
+  const candidates = [
+    normalizedBase,
+    `${normalizedBase}.ts`,
+    `${normalizedBase}.tsx`,
+    `${normalizedBase}.js`,
+    `${normalizedBase}.jsx`,
+    `${normalizedBase}/index.ts`,
+    `${normalizedBase}/index.tsx`,
+    `${normalizedBase}/index.js`,
+    `${normalizedBase}/index.jsx`
+  ];
+
+  return candidates.find((candidate) => knownPaths.has(candidate)) || null;
 }
 
 function inferDefaultExportName(declaration, relativePath) {
@@ -382,7 +401,10 @@ function extractImportEdges(sourceFile, relativePath, context) {
     const defaultImport = importDeclaration.getDefaultImport();
     if (defaultImport) {
       const importName = defaultImport.getText();
-      const targetSymbols = context.symbolsByName.get(importName) || [];
+      const knownPaths = new Set(context.fileSymbolsByPath.keys());
+      const targetPath = resolveRelativeImportPath(relativePath, moduleSpecifier, knownPaths);
+      const defaultTarget = targetPath ? context.defaultSymbolByPath?.get(targetPath) : null;
+      const targetSymbols = defaultTarget ? [defaultTarget] : context.symbolsByName.get(importName) || [];
       addImportEdges(context.edges, sourceSymbols, targetSymbols, importName, 'importa default');
     }
   }
